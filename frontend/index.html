@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HR Platform Dashboard</title>
+    <!-- Подключаем Vue 3 и Tailwind CSS -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Иконки -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body class="bg-gray-100 text-gray-800">
+    <div id="app" class="min-h-screen p-8">
+        
+        <!-- Заголовок -->
+        <header class="mb-8 flex justify-between items-center">
+            <div>
+                <h1 class="text-3xl font-bold text-blue-600">HR Platform v1.0</h1>
+                <p class="text-gray-500">Панель рекрутера</p>
+            </div>
+            <div class="flex gap-2">
+                <button @click="showModal = true" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 shadow">
+                    <i class="fas fa-plus mr-2"></i> Новая вакансия
+                </button>
+                <button @click="fetchData" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 shadow">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- Блок аналитики -->
+        <div class="bg-white p-6 rounded-lg shadow mb-8 flex justify-between items-center">
+            <div>
+                <h2 class="text-xl font-bold mb-2">📊 Воронка найма</h2>
+                <p class="text-gray-500 text-sm">Статистика по текущим кандидатам</p>
+                <div class="mt-4 flex gap-4">
+                    <div class="text-center">
+                        <div class="text-2xl font-bold text-blue-600">{{ candidates.length }}</div>
+                        <div class="text-xs text-gray-400">Всего</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-2xl font-bold text-green-600">{{ candidates.filter(c => c.status === 'interview').length }}</div>
+                        <div class="text-xs text-gray-400">Интервью</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-2xl font-bold text-red-500">{{ candidates.filter(c => c.status === 'rejected').length }}</div>
+                        <div class="text-xs text-gray-400">Отказ</div>
+                    </div>
+                </div>
+            </div>
+            <!-- Сам график -->
+            <div class="w-64 h-32">
+                <canvas id="funnelChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Сетка контента -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+            
+            <!-- Колонка 1: Вакансии -->
+            <div class="bg-white p-6 rounded-lg shadow">
+                <h2 class="text-xl font-bold mb-4 border-b pb-2">📂 Вакансии</h2>
+                <div v-if="vacancies.length === 0" class="text-gray-400">Нет активных вакансий</div>
+                <div v-for="vac in vacancies" :key="vac.id" class="mb-4 p-4 border rounded hover:bg-blue-50 cursor-pointer transition">
+                    <div class="font-bold text-lg">{{ vac.title }}</div>
+                    <div class="text-sm text-gray-600 mt-1">{{ vac.description }}</div>
+                    <div class="mt-2 text-xs bg-green-100 text-green-800 inline-block px-2 py-1 rounded">
+                        ID: {{ vac.id }}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Колонка 2: Кандидаты (Лента) -->
+            <div class="md:col-span-2 bg-white p-6 rounded-lg shadow">
+                <h2 class="text-xl font-bold mb-4 border-b pb-2">👥 Кандидаты (AI Screening)</h2>
+                
+                <div v-if="candidates.length === 0" class="text-center py-10 text-gray-400">
+                    Откликов пока нет. Отправьте резюме через бота!
+                </div>
+
+                <div v-for="cand in candidates" :key="cand.id" class="mb-6 p-5 border rounded-lg shadow-sm bg-white relative overflow-hidden">
+                    <!-- Цветовая полоска рейтинга -->
+                    <div class="absolute left-0 top-0 bottom-0 w-2" 
+                         :class="getScoreColor(cand.ai_score)"></div>
+                    
+                    <div class="ml-4">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <h3 class="text-lg font-bold">{{ cand.first_name }} {{ cand.last_name }}</h3>
+                                <p class="text-sm text-gray-500">Telegram: @{{ cand.telegram_id || 'скрыт' }}</p>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-2xl font-bold" :class="getTextColor(cand.ai_score)">
+                                    {{ cand.ai_score }}%
+                                </div>
+                                <div class="text-xs text-gray-400">AI Score</div>
+                            </div>
+                        </div>
+
+                        <div class="mt-4 bg-gray-50 p-3 rounded text-sm text-gray-700 italic border-l-4 border-blue-200">
+                            🤖 <b>AI Вердикт:</b> {{ cand.ai_summary }}
+                        </div>
+
+                        <!-- Статус и кнопки -->
+                        <div class="mt-4 flex justify-between items-center">
+                            
+                            <!-- Если статус 'screening' (новый), показываем кнопки -->
+                            <div v-if="cand.status === 'screening'" class="flex gap-2">
+                                <button @click="updateStatus(cand.id, 'interview')" 
+                                        class="text-xs bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600 transition">
+                                    <i class="fas fa-check mr-1"></i> Пригласить
+                                </button>
+                                <button @click="updateStatus(cand.id, 'rejected')" 
+                                        class="text-xs bg-red-400 text-white px-3 py-1 rounded hover:bg-red-500 transition">
+                                    <i class="fas fa-times mr-1"></i> Отказать
+                                </button>
+                            </div>
+
+                            <!-- Если статус уже изменен, показываем бейдж -->
+                            <div v-else>
+                                <span v-if="cand.status === 'interview'" class="bg-green-100 text-green-800 text-xs px-2 py-1 rounded font-bold">
+                                    🎉 Приглашен на интервью
+                                </span>
+                                <span v-if="cand.status === 'rejected'" class="bg-red-100 text-red-800 text-xs px-2 py-1 rounded font-bold">
+                                    ⛔ Отказ
+                                </span>
+                            </div>
+
+                            <div class="text-xs text-gray-400">
+                                ID: {{ cand.id }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Модальное окно создания вакансии -->
+        <div v-if="showModal" class="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+            <div class="bg-white p-6 rounded-lg shadow-xl w-96">
+                <h2 class="text-xl font-bold mb-4">✨ Создать вакансию (AI)</h2>
+                
+                <div class="mb-4">
+                    <label class="block text-sm font-bold mb-1">Название должности</label>
+                    <input v-model="newVacancy.title" type="text" class="w-full border p-2 rounded" placeholder="Например: Senior Python Dev">
+                </div>
+                
+                <div class="mb-4">
+                    <label class="block text-sm font-bold mb-1">Ключевые навыки</label>
+                    <textarea v-model="newVacancy.requirements" class="w-full border p-2 rounded" placeholder="Python, FastAPI, Docker..."></textarea>
+                </div>
+
+                <div class="flex justify-end gap-2">
+                    <button @click="showModal = false" class="text-gray-500 px-4 py-2 hover:bg-gray-100 rounded">Отмена</button>
+                    <button @click="createVacancy" :disabled="loading" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 flex items-center">
+                        <span v-if="loading"><i class="fas fa-spinner fa-spin mr-2"></i> Генерируем...</span>
+                        <span v-else>Создать</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { createApp } = Vue
+
+        createApp({
+            data() {
+                return {
+                    vacancies: [],
+                    candidates: [],
+                    apiUrl: 'http://127.0.0.1:8000',
+                    showModal: false,
+                    loading: false,
+                    newVacancy: { title: '', requirements: '' },
+                    chartInstance: null // Для хранения графика
+                }
+            },
+            methods: {
+                async fetchData() {
+                    try {
+                        const resVac = await fetch(`${this.apiUrl}/vacancies/`);
+                        this.vacancies = await resVac.json();
+
+                        const resCand = await fetch(`${this.apiUrl}/candidates/`);
+                        this.candidates = await resCand.json();
+                        this.candidates.reverse();
+                        
+                        // Рисуем график после загрузки данных
+                        this.renderChart();
+                        
+                    } catch (e) {
+                        console.error("Ошибка API:", e);
+                    }
+                },
+                renderChart() {
+                    const ctx = document.getElementById('funnelChart');
+                    if (!ctx) return;
+
+                    // Считаем статистику
+                    const screening = this.candidates.filter(c => c.status === 'screening').length;
+                    const interview = this.candidates.filter(c => c.status === 'interview').length;
+                    const rejected = this.candidates.filter(c => c.status === 'rejected').length;
+
+                    // Если график уже есть, уничтожаем его перед перерисовкой
+                    if (this.chartInstance) {
+                        this.chartInstance.destroy();
+                    }
+
+                    this.chartInstance = new Chart(ctx, {
+                        type: 'doughnut', // Тип графика: бублик
+                        data: {
+                            labels: ['Новые', 'Интервью', 'Отказ'],
+                            datasets: [{
+                                data: [screening, interview, rejected],
+                                backgroundColor: ['#60A5FA', '#4ADE80', '#F87171'],
+                                borderWidth: 0
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { position: 'right', labels: { boxWidth: 10 } }
+                            }
+                        }
+                    });
+                },
+                getScoreColor(score) {
+                    if (score >= 80) return 'bg-green-500';
+                    if (score >= 50) return 'bg-yellow-400';
+                    return 'bg-red-500';
+                },
+                getTextColor(score) {
+                    if (score >= 80) return 'text-green-600';
+                    if (score >= 50) return 'text-yellow-600';
+                    return 'text-red-600';
+                },
+                async updateStatus(id, newStatus) {
+                    try {
+                        const response = await fetch(`${this.apiUrl}/candidates/${id}`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ status: newStatus })
+                        });
+                        if (response.ok) {
+                            const candidate = this.candidates.find(c => c.id === id);
+                            if (candidate) candidate.status = newStatus;
+                            this.renderChart(); // Обновляем график при смене статуса!
+                        }
+                    } catch (e) { console.error(e); }
+                },
+                async createVacancy() {
+                    if (!this.newVacancy.title) return alert("Введите название!");
+                    this.loading = true;
+                    try {
+                        const response = await fetch(`${this.apiUrl}/vacancies/generate`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                title: this.newVacancy.title,
+                                requirements: this.newVacancy.requirements || "Опыт работы",
+                                company_id: 1
+                            })
+                        });
+                        if (response.ok) {
+                            this.showModal = false;
+                            this.newVacancy.title = '';
+                            this.newVacancy.requirements = '';
+                            await this.fetchData();
+                        }
+                    } catch (e) { alert("Ошибка сети"); } 
+                    finally { this.loading = false; }
+                }
+            },
+            mounted() {
+                this.fetchData();
+            }
+        }).mount('#app')
+    </script>
+</body>
+</html>
