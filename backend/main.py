@@ -1,5 +1,6 @@
 import os
 import httpx
+from datetime import datetime  # <--- НОВЫЙ ИМПОРТ
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware  # <--- НОВЫЙ ИМПОРТ
 from sqlalchemy.orm import Session
@@ -61,8 +62,25 @@ class CandidateResponse(BaseModel):
     status: str
     first_name: str
     last_name: str
+    vacancy_id: int           # Добавили
+    vacancy_title: str        # Добавили
+    created_at: datetime      # Добавили
+    
     class Config:
         from_attributes = True
+
+class VacancyDetailResponse(BaseModel):
+    id: int
+    title: str
+    description: str
+    requirements: str
+    status: str
+    candidates_count: int
+    candidates_by_status: dict  # Например: {"new": 5, "interview": 2}
+    
+    class Config:
+        from_attributes = True
+
 
 # --- ENDPOINTS ---
 
@@ -155,7 +173,18 @@ def apply_candidate(application: CandidateApply, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(db_candidate)
     
-    return db_candidate
+    # Возвращаем с vacancy_title
+    return {
+        "id": db_candidate.id,
+        "ai_score": db_candidate.ai_score,
+        "ai_summary": db_candidate.ai_summary,
+        "status": db_candidate.status,
+        "first_name": db_candidate.first_name,
+        "last_name": db_candidate.last_name,
+        "vacancy_id": db_candidate.vacancy_id,
+        "vacancy_title": vacancy.title,
+        "created_at": db_candidate.created_at
+    }
 
 @app.patch("/candidates/{candidate_id}", response_model=CandidateResponse)
 async def update_candidate_status(candidate_id: int, status_update: CandidateUpdate, db: Session = Depends(get_db)):
@@ -190,10 +219,85 @@ async def update_candidate_status(candidate_id: int, status_update: CandidateUpd
                 except Exception as e:
                     print(f"Ошибка отправки уведомления: {e}")
 
-    return candidate
+    # Возвращаем с vacancy_title
+    vac_title = candidate.vacancy.title if candidate.vacancy else "Архив/Без вакансии"
+    return {
+        "id": candidate.id,
+        "ai_score": candidate.ai_score,
+        "ai_summary": candidate.ai_summary,
+        "status": candidate.status,
+        "first_name": candidate.first_name,
+        "last_name": candidate.last_name,
+        "vacancy_id": candidate.vacancy_id,
+        "vacancy_title": vac_title,
+        "created_at": candidate.created_at
+    }
 
 # Добавим ручку для получения кандидатов (чтобы видеть их на фронте)
 @app.get("/candidates/", response_model=List[CandidateResponse])
 def read_candidates(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     candidates = db.query(Candidate).offset(skip).limit(limit).all()
-    return candidates
+    result = []
+    for c in candidates:
+        # Если вакансия удалена, пишем "Архив", чтобы не было ошибки
+        vac_title = c.vacancy.title if c.vacancy else "Архив/Без вакансии"
+        
+        result.append({
+            "id": c.id,
+            "ai_score": c.ai_score,
+            "ai_summary": c.ai_summary,
+            "status": c.status,
+            "first_name": c.first_name,
+            "last_name": c.last_name,
+            "vacancy_id": c.vacancy_id,
+            "vacancy_title": vac_title,
+            "created_at": c.created_at
+        })
+    return result
+
+@app.get("/vacancies/{vacancy_id}", response_model=VacancyDetailResponse)
+def get_vacancy_detail(vacancy_id: int, db: Session = Depends(get_db)):
+    vacancy = db.query(Vacancy).filter(Vacancy.id == vacancy_id).first()
+    if not vacancy:
+        raise HTTPException(status_code=404, detail="Вакансия не найдена")
+    
+    candidates = db.query(Candidate).filter(Candidate.vacancy_id == vacancy_id).all()
+    
+    # Считаем статистику: сколько людей на каком этапе
+    status_counts = {}
+    for c in candidates:
+        status_counts[c.status] = status_counts.get(c.status, 0) + 1
+    
+    return {
+        "id": vacancy.id,
+        "title": vacancy.title,
+        "description": vacancy.description,
+        "requirements": vacancy.requirements,
+        "status": vacancy.status,
+        "candidates_count": len(candidates),
+        "candidates_by_status": status_counts
+    }
+
+@app.get("/vacancies/{vacancy_id}/candidates", response_model=List[CandidateResponse])
+def get_vacancy_candidates(vacancy_id: int, db: Session = Depends(get_db)):
+    vacancy = db.query(Vacancy).filter(Vacancy.id == vacancy_id).first()
+    if not vacancy:
+        raise HTTPException(status_code=404, detail="Вакансия не найдена")
+    
+    candidates = db.query(Candidate).filter(Candidate.vacancy_id == vacancy_id).all()
+    
+    # Собираем ответ вручную, чтобы заполнить vacancy_title
+    result = []
+    for c in candidates:
+        result.append({
+            "id": c.id,
+            "ai_score": c.ai_score,
+            "ai_summary": c.ai_summary,
+            "status": c.status,
+            "first_name": c.first_name,
+            "last_name": c.last_name,
+            "vacancy_id": c.vacancy_id,
+            "vacancy_title": vacancy.title,
+            "created_at": c.created_at
+        })
+    return result
