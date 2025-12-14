@@ -3,258 +3,419 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HR Platform Dashboard</title>
-    <!-- Подключаем Vue 3 и Tailwind CSS -->
+    <title>HR Platform v2.0</title>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- SortableJS для Drag & Drop -->
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
-    <!-- Иконки -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
-<body class="bg-gray-100 text-gray-800">
-    <div id="app" class="min-h-screen p-8">
+<body class="bg-gray-100 text-gray-800 font-sans">
+    <div id="app" class="min-h-screen flex flex-col">
         
-        <!-- Заголовок -->
-        <header class="mb-8 flex justify-between items-center">
-            <div>
-                <h1 class="text-3xl font-bold text-blue-600">HR Platform v1.0</h1>
-                <p class="text-gray-500">Панель рекрутера</p>
+        <!-- ========== ШАПКА С НАВИГАЦИЕЙ ========== -->
+        <header class="bg-white shadow-sm sticky top-0 z-40">
+            <div class="border-b">
+                <div class="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-700 rounded-lg flex items-center justify-center text-white font-bold shadow-lg">
+                            HR
+                        </div>
+                        <div>
+                            <h1 class="text-xl font-bold text-gray-800 leading-tight">HR Platform</h1>
+                            <p class="text-xs text-gray-500">v2.0 Enterprise</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <div class="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-lg border">
+                            <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold">
+                                A
+                            </div>
+                            <div class="text-sm hidden md:block">
+                                <div class="font-medium text-gray-700">Admin User</div>
+                                <div class="text-xs text-gray-500">Рекрутер</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
-            <div class="flex gap-2">
-                <button @click="showModal = true" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 shadow">
-                    <i class="fas fa-plus mr-2"></i> Новая вакансия
-                </button>
-                <button @click="fetchData" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 shadow">
-                    <i class="fas fa-sync-alt"></i>
-                </button>
+            
+            <!-- Вкладки -->
+            <div class="max-w-7xl mx-auto px-4 overflow-x-auto">
+                <nav class="flex gap-6">
+                    <button @click="currentTab = 'dashboard'" :class="['py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap', currentTab === 'dashboard' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700']">
+                        <i class="fas fa-chart-pie mr-2"></i>Дашборд
+                    </button>
+                    <button @click="currentTab = 'vacancies'; fetchData()" :class="['py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap', currentTab === 'vacancies' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700']">
+                        <i class="fas fa-briefcase mr-2"></i>Вакансии
+                    </button>
+                    <button @click="currentTab = 'candidates'; loadCandidates(); loadCandidatesStats()" :class="['py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap', currentTab === 'candidates' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700']">
+                        <i class="fas fa-users mr-2"></i>Кандидаты
+                    </button>
+                    <button @click="currentTab = 'settings'" :class="['py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap', currentTab === 'settings' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700']">
+                        <i class="fas fa-cog mr-2"></i>Настройки
+                    </button>
+                </nav>
             </div>
         </header>
 
-        <!-- Блок аналитики -->
-        <div class="bg-white p-6 rounded-lg shadow mb-8 flex justify-between items-center">
-            <div>
-                <h2 class="text-xl font-bold mb-2">📊 Воронка найма</h2>
-                <p class="text-gray-500 text-sm">Статистика по текущим кандидатам</p>
-                <div class="mt-4 flex gap-4">
-                    <div class="text-center">
-                        <div class="text-2xl font-bold text-blue-600">{{ candidates.length }}</div>
-                        <div class="text-xs text-gray-400">Всего</div>
-                    </div>
-                    <div class="text-center">
-                        <div class="text-2xl font-bold text-green-600">{{ candidates.filter(c => c.status === 'interview').length }}</div>
-                        <div class="text-xs text-gray-400">Интервью</div>
-                    </div>
-                    <div class="text-center">
-                        <div class="text-2xl font-bold text-red-500">{{ candidates.filter(c => c.status === 'rejected').length }}</div>
-                        <div class="text-xs text-gray-400">Отказ</div>
-                    </div>
-                </div>
-            </div>
-            <!-- Сам график -->
-            <div class="w-64 h-32">
-                <canvas id="funnelChart"></canvas>
-            </div>
-        </div>
-
-        <!-- Сетка контента -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <!-- ========== КОНТЕНТ ========== -->
+        <main class="flex-1 max-w-7xl mx-auto px-4 py-6 w-full">
             
-            <!-- Колонка 1: Вакансии -->
-            <div class="bg-white p-6 rounded-lg shadow">
-                <h2 class="text-xl font-bold mb-4 border-b pb-2">📂 Вакансии</h2>
-                <div v-if="vacancies.length === 0" class="text-gray-400">Нет активных вакансий</div>
-                <div v-for="vac in vacancies" :key="vac.id" @click="openVacancy(vac.id)" class="mb-4 p-4 border rounded hover:bg-blue-50 cursor-pointer transition hover:shadow-md">
-                    <div class="font-bold text-lg">{{ vac.title }}</div>
-                    <div class="text-sm text-gray-600 mt-1">{{ vac.description }}</div>
-                    <div class="mt-2 text-xs bg-green-100 text-green-800 inline-block px-2 py-1 rounded">
-                        ID: {{ vac.id }}
+            <!-- 1. ДАШБОРД -->
+            <div v-if="currentTab === 'dashboard'" class="space-y-6">
+                <div class="bg-white p-6 rounded-lg shadow-sm border">
+                    <h2 class="text-xl font-bold mb-4">👋 Добро пожаловать!</h2>
+                    <p class="text-gray-600">Выберите вкладку "Вакансии" для работы с воронкой или "Кандидаты" для поиска по базе.</p>
+                </div>
+            </div>
+
+            <!-- 2. ВАКАНСИИ -->
+            <div v-if="currentTab === 'vacancies'">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold text-gray-800">Активные вакансии</h2>
+                    <button @click="showModal = true" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 shadow transition flex items-center">
+                        <i class="fas fa-plus mr-2"></i> Создать вакансию
+                    </button>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div v-for="vac in vacancies" :key="vac.id" @click="openVacancy(vac.id)" class="bg-white p-5 rounded-xl shadow-sm border hover:shadow-md cursor-pointer transition group">
+                        <div class="flex justify-between items-start mb-2">
+                            <h3 class="font-bold text-lg text-gray-800 group-hover:text-blue-600 transition">{{ vac.title }}</h3>
+                            <span class="bg-green-100 text-green-700 text-xs px-2 py-1 rounded-full font-medium">Active</span>
+                        </div>
+                        <p class="text-sm text-gray-500 line-clamp-2 mb-4">{{ vac.description }}</p>
+                        <div class="flex justify-between items-center text-xs text-gray-400 border-t pt-3">
+                            <span>ID: {{ vac.id }}</span>
+                            <span>Кликните для деталей →</span>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Колонка 2: Кандидаты (Лента) -->
-            <div class="md:col-span-2 bg-white p-6 rounded-lg shadow">
-                <h2 class="text-xl font-bold mb-4 border-b pb-2">👥 Кандидаты (AI Screening)</h2>
+            <!-- 3. КАНДИДАТЫ -->
+            <div v-if="currentTab === 'candidates'">
                 
-                <div v-if="candidates.length === 0" class="text-center py-10 text-gray-400">
-                    Откликов пока нет. Отправьте резюме через бота!
+                <!-- Статистика сверху -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div class="bg-white p-4 rounded-lg shadow-sm border flex items-center justify-between">
+                        <div>
+                            <div class="text-gray-500 text-xs uppercase font-bold">Всего кандидатов</div>
+                            <div class="text-2xl font-bold text-gray-800">{{ candidatesStats.total }}</div>
+                        </div>
+                        <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-600">
+                            <i class="fas fa-users"></i>
+                        </div>
+                    </div>
+                    <div class="bg-white p-4 rounded-lg shadow-sm border flex items-center justify-between">
+                        <div>
+                            <div class="text-gray-500 text-xs uppercase font-bold">Средний Score</div>
+                            <div class="text-2xl font-bold text-purple-600">{{ candidatesStats.avg_score }}%</div>
+                        </div>
+                        <div class="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center text-purple-600">
+                            <i class="fas fa-brain"></i>
+                        </div>
+                    </div>
+                    <div class="bg-white p-4 rounded-lg shadow-sm border flex items-center justify-between">
+                        <div>
+                            <div class="text-gray-500 text-xs uppercase font-bold">Экспорт</div>
+                            <button @click="exportCandidates" class="text-sm text-blue-600 hover:underline">Скачать CSV</button>
+                        </div>
+                        <div class="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center text-green-600">
+                            <i class="fas fa-file-excel"></i>
+                        </div>
+                    </div>
                 </div>
 
-                <div v-for="cand in candidates" :key="cand.id" class="mb-6 p-5 border rounded-lg shadow-sm bg-white relative overflow-hidden">
-                    <!-- Цветовая полоска рейтинга -->
-                    <div class="absolute left-0 top-0 bottom-0 w-2" 
-                         :class="getScoreColor(cand.ai_score)"></div>
+                <!-- Панель фильтров -->
+                <div class="bg-white p-4 rounded-lg shadow-sm border mb-6">
+                    <div class="flex flex-wrap gap-4">
+                        <!-- Поиск -->
+                        <div class="flex-1 min-w-[200px]">
+                            <div class="relative">
+                                <input v-model="filters.search" @input="debouncedSearch" type="text" placeholder="Поиск по имени, email..." class="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                                <span class="absolute left-3 top-2.5 text-gray-400"><i class="fas fa-search"></i></span>
+                            </div>
+                        </div>
+                        <!-- Фильтры -->
+                        <select v-model="filters.status" @change="loadCandidates" class="border rounded-lg px-3 py-2 bg-white">
+                            <option value="">Все статусы</option>
+                            <option v-for="s in statuses" :key="s.key" :value="s.key">{{ s.label }}</option>
+                        </select>
+                        <select v-model="filters.vacancy_id" @change="loadCandidates" class="border rounded-lg px-3 py-2 bg-white max-w-[200px]">
+                            <option value="">Все вакансии</option>
+                            <option v-for="v in vacancies" :key="v.id" :value="v.id">{{ v.title }}</option>
+                        </select>
+                        <button @click="resetFilters" class="text-gray-500 hover:text-gray-700 px-2">
+                            <i class="fas fa-times"></i> Сброс
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Таблица -->
+                <div class="bg-white rounded-lg shadow-sm border overflow-hidden">
+                    <table class="w-full text-left border-collapse">
+                        <thead class="bg-gray-50 border-b">
+                            <tr>
+                                <th class="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Кандидат</th>
+                                <th class="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Вакансия</th>
+                                <th class="px-6 py-3 text-xs font-medium text-gray-500 uppercase text-center">AI Score</th>
+                                <th class="px-6 py-3 text-xs font-medium text-gray-500 uppercase text-center">Статус</th>
+                                <th class="px-6 py-3 text-xs font-medium text-gray-500 uppercase text-right">Дата</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200">
+                            <!-- ОБНОВЛЕНО: Добавлен @click для открытия карточки -->
+                            <tr v-for="cand in candidatesList.items" :key="cand.id" @click="openCandidateCard(cand.id)" class="hover:bg-gray-50 cursor-pointer transition">
+                                <td class="px-6 py-4">
+                                    <div class="flex items-center">
+                                        <div class="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold mr-3">
+                                            {{ cand.first_name[0] }}
+                                        </div>
+                                        <div>
+                                            <div class="font-medium text-gray-900">{{ cand.first_name }} {{ cand.last_name }}</div>
+                                            <div class="text-xs text-gray-500">{{ cand.email }}</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 text-sm text-gray-600">
+                                    {{ cand.vacancy_title }}
+                                </td>
+                                <td class="px-6 py-4 text-center">
+                                    <span class="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-xs font-medium border"
+                                          :class="getScoreBgColor(cand.ai_score)">
+                                        {{ cand.ai_score }}%
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4 text-center">
+                                    <span class="px-2 py-1 text-xs rounded-full" :class="getStatusClass(cand.status)">
+                                        {{ getStatusLabel(cand.status) }}
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4 text-right text-sm text-gray-500">
+                                    {{ new Date(cand.created_at).toLocaleDateString() }}
+                                </td>
+                            </tr>
+                            <!-- Если пусто -->
+                            <tr v-if="candidatesList.items.length === 0">
+                                <td colspan="5" class="px-6 py-10 text-center text-gray-500">
+                                    Кандидаты не найдены
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
                     
-                    <div class="ml-4">
-                        <div class="flex justify-between items-start">
-                            <div>
-                                <h3 class="text-lg font-bold">{{ cand.first_name }} {{ cand.last_name }}</h3>
-                                
-                                <!-- Новые поля: Вакансия и Дата -->
-                                <div class="mb-2">
-                                    <p class="text-sm text-blue-600 font-medium flex items-center">
-                                        <i class="fas fa-briefcase mr-2"></i> {{ cand.vacancy_title }}
-                                    </p>
-                                    <p class="text-xs text-gray-400 flex items-center mt-1">
-                                        <i class="far fa-clock mr-2"></i> 
-                                        Отклик: {{ new Date(cand.created_at).toLocaleDateString('ru-RU') }}
-                                    </p>
-                                </div>
-
-                                <p class="text-sm text-gray-500">Telegram: @{{ cand.telegram_id || 'скрыт' }}</p>
-                            </div>
-                            <div class="text-right">
-                                <div class="text-2xl font-bold" :class="getTextColor(cand.ai_score)">
-                                    {{ cand.ai_score }}%
-                                </div>
-                                <div class="text-xs text-gray-400">AI Score</div>
-                            </div>
-                        </div>
-
-                        <div class="mt-4 bg-gray-50 p-3 rounded text-sm text-gray-700 italic border-l-4 border-blue-200">
-                            🤖 <b>AI Вердикт:</b> {{ cand.ai_summary }}
-                        </div>
-
-                        <!-- Статус и кнопки -->
-                        <div class="mt-4 flex justify-between items-center">
-                            
-                            <!-- Если статус 'screening' (новый), показываем кнопки -->
-                            <div v-if="cand.status === 'screening'" class="flex gap-2">
-                                <button @click="updateStatus(cand.id, 'interview')" 
-                                        class="text-xs bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600 transition">
-                                    <i class="fas fa-check mr-1"></i> Пригласить
-                                </button>
-                                <button @click="updateStatus(cand.id, 'rejected')" 
-                                        class="text-xs bg-red-400 text-white px-3 py-1 rounded hover:bg-red-500 transition">
-                                    <i class="fas fa-times mr-1"></i> Отказать
-                                </button>
-                            </div>
-
-                            <!-- Если статус уже изменен, показываем бейдж -->
-                            <div v-else>
-                                <span v-if="cand.status === 'interview'" class="bg-green-100 text-green-800 text-xs px-2 py-1 rounded font-bold">
-                                    🎉 Приглашен на интервью
-                                </span>
-                                <span v-if="cand.status === 'rejected'" class="bg-red-100 text-red-800 text-xs px-2 py-1 rounded font-bold">
-                                    ⛔ Отказ
-                                </span>
-                            </div>
-
-                            <div class="text-xs text-gray-400">
-                                ID: {{ cand.id }}
-                            </div>
+                    <!-- Пагинация -->
+                    <div class="bg-gray-50 px-6 py-3 border-t flex justify-between items-center">
+                        <span class="text-sm text-gray-500">
+                            Страница {{ candidatesList.page }} из {{ candidatesList.pages }}
+                        </span>
+                        <div class="flex gap-2">
+                            <button @click="goToPage(candidatesList.page - 1)" :disabled="candidatesList.page <= 1" class="px-3 py-1 border rounded bg-white hover:bg-gray-50 disabled:opacity-50">Назад</button>
+                            <button @click="goToPage(candidatesList.page + 1)" :disabled="candidatesList.page >= candidatesList.pages" class="px-3 py-1 border rounded bg-white hover:bg-gray-50 disabled:opacity-50">Вперед</button>
                         </div>
                     </div>
                 </div>
             </div>
 
-        </div>
+            <!-- 4. НАСТРОЙКИ -->
+            <div v-if="currentTab === 'settings'">
+                <div class="bg-white p-6 rounded-lg shadow-sm border">
+                    <h2 class="text-xl font-bold mb-4">⚙️ Настройки системы</h2>
+                    <p class="text-gray-600">Интеграции с Telegram и hh.ru будут здесь.</p>
+                </div>
+            </div>
 
-        <!-- Модальное окно создания вакансии -->
+        </main>
+
+        <!-- ========== МОДАЛКИ ========== -->
+        
+        <!-- 1. Создание вакансии -->
         <div v-if="showModal" class="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
             <div class="bg-white p-6 rounded-lg shadow-xl w-96">
                 <h2 class="text-xl font-bold mb-4">✨ Создать вакансию (AI)</h2>
-                
                 <div class="mb-4">
                     <label class="block text-sm font-bold mb-1">Название должности</label>
                     <input v-model="newVacancy.title" type="text" class="w-full border p-2 rounded" placeholder="Например: Senior Python Dev">
                 </div>
-                
                 <div class="mb-4">
                     <label class="block text-sm font-bold mb-1">Ключевые навыки</label>
                     <textarea v-model="newVacancy.requirements" class="w-full border p-2 rounded" placeholder="Python, FastAPI, Docker..."></textarea>
                 </div>
-
                 <div class="flex justify-end gap-2">
                     <button @click="showModal = false" class="text-gray-500 px-4 py-2 hover:bg-gray-100 rounded">Отмена</button>
-                    <button @click="createVacancy" :disabled="loading" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 flex items-center">
-                        <span v-if="loading"><i class="fas fa-spinner fa-spin mr-2"></i> Генерируем...</span>
+                    <button @click="createVacancy" :disabled="loading" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 flex items-center">
+                        <span v-if="loading"><i class="fas fa-spinner fa-spin mr-2"></i> AI думает...</span>
                         <span v-else>Создать</span>
                     </button>
                 </div>
             </div>
         </div>
 
-        <!-- Модальное окно: Детали вакансии + Канбан -->
-        <div v-if="showVacancyDetail" class="fixed inset-0 bg-black bg-opacity-50 z-50 overflow-auto flex justify-center items-start pt-10">
-            <div class="bg-white w-full max-w-6xl rounded-lg shadow-xl mb-10 mx-4">
-                
-                <!-- Шапка окна -->
-                <div class="sticky top-0 bg-white border-b p-6 flex justify-between items-center rounded-t-lg z-10">
+        <!-- 2. Детали вакансии + КАНБАН -->
+        <div v-if="showVacancyDetail" class="fixed inset-0 bg-black bg-opacity-50 z-50 overflow-auto flex justify-center items-start pt-5 pb-5">
+            <div class="bg-white w-full max-w-[95%] h-[90vh] rounded-lg shadow-xl flex flex-col">
+                <!-- Шапка -->
+                <div class="p-4 border-b flex justify-between items-center bg-gray-50 rounded-t-lg">
                     <div>
-                        <h2 class="text-2xl font-bold text-gray-800">{{ selectedVacancy.title }}</h2>
-                        <p class="text-sm text-gray-500 mt-1">
-                            Всего кандидатов: {{ selectedVacancy.candidates_count }}
-                        </p>
+                        <h2 class="text-xl font-bold">{{ selectedVacancy.title }}</h2>
+                        <p class="text-xs text-gray-500">Кандидатов: {{ selectedVacancy.candidates_count }}</p>
                     </div>
-                    <button @click="closeVacancyDetail" class="text-gray-400 hover:text-gray-700 text-3xl font-bold">&times;</button>
+                    <button @click="closeVacancyDetail" class="text-gray-400 hover:text-gray-700 text-2xl">&times;</button>
                 </div>
-
-                <!-- Описание (сворачиваемое) -->
-                <div class="p-6 bg-gray-50 border-b">
-                    <details>
-                        <summary class="cursor-pointer font-bold text-blue-600 hover:text-blue-800">
-                            📋 Показать описание и требования
-                        </summary>
-                        <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
-                            <div>
-                                <h4 class="font-bold mb-2">Описание:</h4>
-                                <p class="whitespace-pre-wrap text-gray-700">{{ selectedVacancy.description }}</p>
-                            </div>
-                            <div>
-                                <h4 class="font-bold mb-2">Требования:</h4>
-                                <p class="whitespace-pre-wrap text-gray-700">{{ selectedVacancy.requirements }}</p>
-                            </div>
-                        </div>
-                    </details>
-                </div>
-
-                <!-- KANBAN BOARD -->
-                <div class="p-6 overflow-x-auto xl:overflow-x-visible">
-                    <div class="flex gap-4 pb-4">
-                        
-                        <!-- Генерируем колонки циклом -->
-                        <div v-for="status in statuses" :key="status.key" class="kanban-column bg-gray-100 rounded-lg p-3 min-w-[280px] w-[280px] xl:w-full xl:min-w-0 xl:flex-1 flex-shrink-0 xl:flex-shrink flex flex-col max-h-[70vh]">
-                            
-                            <!-- Заголовок колонки -->
-                            <div class="flex justify-between items-center mb-3 px-1">
-                                <h3 class="font-bold text-gray-700 flex items-center">
-                                    <span class="w-3 h-3 rounded-full mr-2" :class="status.color"></span>
+                
+                <!-- Канбан (Скроллируемая область) -->
+                <div class="flex-1 overflow-x-auto p-4 bg-gray-100">
+                    <div class="flex gap-4 h-full min-w-max">
+                        <div v-for="status in statuses" :key="status.key" class="flex flex-col w-80 bg-gray-200 rounded-lg p-2 h-full">
+                            <div class="flex justify-between items-center mb-2 px-2">
+                                <span class="font-bold text-gray-700 text-sm flex items-center">
+                                    <span class="w-2 h-2 rounded-full mr-2" :class="status.color"></span>
                                     {{ status.label }}
-                                </h3>
-                                <span class="bg-white text-gray-600 text-xs px-2 py-1 rounded-full shadow-sm">
+                                </span>
+                                <span class="bg-white text-xs px-2 py-0.5 rounded-full text-gray-500 shadow-sm">
                                     {{ vacancyCandidatesByStatus(status.key).length }}
                                 </span>
                             </div>
-
-                            <!-- Тело колонки (сюда кидаем карточки) -->
-                            <div class="column-body space-y-3 overflow-y-auto flex-1 pr-1" :data-status="status.key">
-                                
+                            
+                            <!-- Колонка -->
+                            <div class="column-body flex-1 overflow-y-auto space-y-2 pr-1" :data-status="status.key">
                                 <div v-for="cand in vacancyCandidatesByStatus(status.key)" 
                                      :key="cand.id" 
                                      :data-id="cand.id"
-                                     class="kanban-card bg-white p-4 rounded shadow-sm cursor-move hover:shadow-md border-l-4 transition"
+                                     class="bg-white p-3 rounded shadow-sm cursor-move hover:shadow-md border-l-4 transition relative group"
                                      :class="getScoreBorderColor(cand.ai_score)">
                                     
                                     <div class="flex justify-between items-start">
-                                        <div class="font-bold text-gray-800">{{ cand.first_name }} {{ cand.last_name }}</div>
+                                        <div class="font-bold text-sm text-gray-800">{{ cand.first_name }} {{ cand.last_name }}</div>
                                         <div class="text-xs font-bold" :class="getTextColor(cand.ai_score)">{{ cand.ai_score }}%</div>
                                     </div>
-                                    
-                                    <div class="text-xs text-gray-500 mt-1">@{{ cand.telegram_id || '...' }}</div>
-                                    
-                                    <div class="mt-2 text-xs text-gray-600 bg-gray-50 p-2 rounded italic line-clamp-3">
+                                    <div class="text-xs text-gray-500 mt-1">@{{ cand.telegram_id }}</div>
+                                    <div class="mt-2 text-xs text-gray-600 bg-gray-50 p-1.5 rounded italic line-clamp-2">
                                         {{ cand.ai_summary }}
                                     </div>
-
-                                    <div class="mt-2 text-xs text-gray-400 text-right">
+                                    <div class="mt-2 text-[10px] text-gray-400 text-right">
                                         {{ new Date(cand.created_at).toLocaleDateString() }}
                                     </div>
                                 </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
 
+        <!-- 3. КАРТОЧКА КАНДИДАТА (НОВОЕ) -->
+        <div v-if="showCandidateCard" class="fixed inset-0 bg-black bg-opacity-50 z-50 overflow-auto flex justify-center items-start pt-5 pb-5">
+            <div class="bg-white w-full max-w-5xl rounded-lg shadow-xl min-h-[80vh] flex flex-col">
+                
+                <!-- Шапка -->
+                <div class="p-6 border-b flex justify-between items-start bg-gray-50 rounded-t-lg">
+                    <div class="flex gap-5">
+                        <div class="w-20 h-20 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-white text-3xl font-bold shadow-md">
+                            {{ candidateDetail.first_name[0] }}
+                        </div>
+                        <div>
+                            <h2 class="text-3xl font-bold text-gray-800">{{ candidateDetail.first_name }} {{ candidateDetail.last_name }}</h2>
+                            <p class="text-blue-600 font-medium mt-1">{{ candidateDetail.vacancy_title }}</p>
+                            <div class="flex gap-2 mt-3">
+                                <span class="px-3 py-1 rounded-full text-sm font-medium" :class="getStatusClass(candidateDetail.status)">
+                                    {{ getStatusLabel(candidateDetail.status) }}
+                                </span>
+                                <span class="px-3 py-1 rounded-full text-sm font-medium bg-gray-200 text-gray-700">
+                                    {{ candidateDetail.source === 'telegram' ? 'Telegram Bot' : 'Ручной ввод' }}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex flex-col items-end gap-4">
+                        <button @click="closeCandidateCard" class="text-gray-400 hover:text-gray-700 text-3xl">&times;</button>
+                        <div class="text-center">
+                            <div class="text-3xl font-bold" :class="getTextColor(candidateDetail.ai_score)">{{ candidateDetail.ai_score }}%</div>
+                            <div class="text-xs text-gray-500 uppercase">AI Score</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Контент (2 колонки) -->
+                <div class="flex-1 grid grid-cols-1 lg:grid-cols-3">
+                    
+                    <!-- ЛЕВАЯ КОЛОНКА: Инфо и Резюме -->
+                    <div class="lg:col-span-2 p-6 border-r space-y-6">
+                        
+                        <!-- Контакты -->
+                        <div class="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-lg">
+                            <div>
+                                <div class="text-xs text-gray-500">Email</div>
+                                <a :href="'mailto:'+candidateDetail.email" class="text-blue-600 hover:underline">{{ candidateDetail.email }}</a>
+                            </div>
+                            <div>
+                                <div class="text-xs text-gray-500">Telegram</div>
+                                <div class="text-gray-800">@{{ candidateDetail.telegram_id || '-' }}</div>
+                            </div>
+                            <div>
+                                <div class="text-xs text-gray-500">Дата отклика</div>
+                                <div class="text-gray-800">{{ new Date(candidateDetail.created_at).toLocaleDateString() }}</div>
+                            </div>
+                        </div>
+
+                        <!-- AI Анализ -->
+                        <div class="bg-blue-50 p-5 rounded-lg border border-blue-100">
+                            <h3 class="font-bold text-blue-800 mb-2"><i class="fas fa-robot mr-2"></i>Мнение Искусственного Интеллекта</h3>
+                            <p class="text-gray-700 leading-relaxed">{{ candidateDetail.ai_summary }}</p>
+                        </div>
+
+                        <!-- Резюме -->
+                        <div>
+                            <h3 class="font-bold text-gray-800 mb-3 text-lg">📄 Текст резюме</h3>
+                            <div class="bg-gray-50 p-4 rounded-lg border text-sm text-gray-700 whitespace-pre-wrap font-mono max-h-96 overflow-y-auto">
+                                {{ candidateDetail.resume_text }}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ПРАВАЯ КОЛОНКА: Действия, Комменты, История -->
+                    <div class="p-6 bg-gray-50 space-y-6">
+                        
+                        <!-- Быстрые действия -->
+                        <div class="bg-white p-4 rounded-lg shadow-sm border">
+                            <h3 class="font-bold text-gray-800 mb-3">Действия</h3>
+                            <div class="flex flex-col gap-2">
+                                <button @click="changeStatusFromCard('interview')" v-if="candidateDetail.status === 'screening'" class="w-full bg-green-500 text-white py-2 rounded hover:bg-green-600 transition">Пригласить на интервью</button>
+                                <button @click="changeStatusFromCard('offer')" v-if="candidateDetail.status === 'interview'" class="w-full bg-orange-500 text-white py-2 rounded hover:bg-orange-600 transition">Сделать оффер</button>
+                                <button @click="changeStatusFromCard('rejected')" v-if="candidateDetail.status !== 'rejected'" class="w-full bg-red-100 text-red-600 py-2 rounded hover:bg-red-200 transition">Отказать</button>
+                            </div>
+                        </div>
+
+                        <!-- Комментарии -->
+                        <div class="bg-white p-4 rounded-lg shadow-sm border">
+                            <h3 class="font-bold text-gray-800 mb-3">Комментарии</h3>
+                            <div class="space-y-3 mb-4 max-h-60 overflow-y-auto">
+                                <div v-for="comm in candidateDetail.comments" :key="comm.id" class="bg-gray-50 p-2 rounded text-sm">
+                                    <div class="flex justify-between text-xs text-gray-500 mb-1">
+                                        <span class="font-bold">{{ comm.author_name }}</span>
+                                        <span>{{ new Date(comm.created_at).toLocaleDateString() }}</span>
+                                    </div>
+                                    <p>{{ comm.text }}</p>
+                                </div>
+                                <div v-if="candidateDetail.comments && candidateDetail.comments.length === 0" class="text-center text-gray-400 text-sm">Нет комментариев</div>
+                            </div>
+                            <div class="flex gap-2">
+                                <input v-model="newComment" @keyup.enter="addComment" type="text" placeholder="Написать заметку..." class="flex-1 border rounded px-2 py-1 text-sm">
+                                <button @click="addComment" class="bg-blue-600 text-white px-3 py-1 rounded text-sm"><i class="fas fa-paper-plane"></i></button>
+                            </div>
+                        </div>
+
+                        <!-- История -->
+                        <div>
+                            <h3 class="font-bold text-gray-500 text-xs uppercase mb-3">История активности</h3>
+                            <div class="space-y-4 border-l-2 border-gray-200 ml-2 pl-4">
+                                <div v-for="act in candidateDetail.activities" :key="act.id" class="relative">
+                                    <div class="absolute -left-[21px] top-1 w-3 h-3 bg-gray-300 rounded-full border-2 border-white"></div>
+                                    <p class="text-sm text-gray-800">{{ act.description }}</p>
+                                    <p class="text-xs text-gray-400">{{ new Date(act.created_at).toLocaleString() }}</p>
+                                </div>
                             </div>
                         </div>
 
@@ -271,32 +432,41 @@
         createApp({
             data() {
                 return {
-                    vacancies: [],
-                    candidates: [], // Общий список (для главной)
+                    currentTab: 'dashboard', // Активная вкладка
                     apiUrl: 'http://127.0.0.1:8000',
+                    vacancies: [],
+                    candidates: [],
                     
-                    // Для создания вакансии
+                    // Модалки
                     showModal: false,
-                    loading: false,
-                    newVacancy: { title: '', requirements: '' },
-                    
-                    // Для графика
-                    chartInstance: null,
-
-                    // --- НОВЫЕ ПЕРЕМЕННЫЕ ДЛЯ КАНБАНА ---
                     showVacancyDetail: false,
-                    selectedVacancy: {},
-                    vacancyCandidates: [], // Кандидаты конкретной вакансии
+                    loading: false,
                     
-                    // Настройки колонок Канбана
+                    // Данные
+                    newVacancy: { title: '', requirements: '' },
+                    selectedVacancy: {},
+                    vacancyCandidates: [],
+                    
+                    // Канбан настройки
                     statuses: [
-                        { key: 'new', label: '📥 Новый', color: 'bg-blue-400' },
-                        { key: 'screening', label: '🔍 Скрининг', color: 'bg-purple-400' },
-                        { key: 'interview', label: '🗣 Интервью', color: 'bg-yellow-400' },
-                        { key: 'offer', label: '📝 Оффер', color: 'bg-orange-400' },
-                        { key: 'hired', label: '✅ Нанят', color: 'bg-green-500' },
-                        { key: 'rejected', label: '❌ Отказ', color: 'bg-red-500' }
-                    ]
+                        { key: 'new', label: 'Новый', color: 'bg-blue-500' },
+                        { key: 'screening', label: 'Скрининг', color: 'bg-purple-500' },
+                        { key: 'interview', label: 'Интервью', color: 'bg-yellow-500' },
+                        { key: 'offer', label: 'Оффер', color: 'bg-orange-500' },
+                        { key: 'hired', label: 'Нанят', color: 'bg-green-500' },
+                        { key: 'rejected', label: 'Отказ', color: 'bg-red-500' }
+                    ],
+
+                    // ДЛЯ ТАБЛИЦЫ КАНДИДАТОВ
+                    candidatesList: { items: [], total: 0, page: 1, pages: 1 },
+                    candidatesStats: { total: 0, avg_score: 0 },
+                    filters: { search: '', status: '', vacancy_id: '' },
+                    searchTimeout: null,
+
+                    // ДЛЯ КАРТОЧКИ КАНДИДАТА (НОВОЕ)
+                    showCandidateCard: false,
+                    candidateDetail: { comments: [], activities: [], first_name: '' }, // Инициализация
+                    newComment: '',
                 }
             },
             methods: {
@@ -304,162 +474,178 @@
                     try {
                         const resVac = await fetch(`${this.apiUrl}/vacancies/`);
                         this.vacancies = await resVac.json();
-
-                        const resCand = await fetch(`${this.apiUrl}/candidates/`);
-                        this.candidates = await resCand.json();
-                        this.candidates.reverse();
-                        
-                        this.renderChart();
-                    } catch (e) { console.error("Ошибка API:", e); }
+                    } catch (e) { console.error(e); }
                 },
-
-                // --- ЛОГИКА КАНБАНА ---
                 async openVacancy(id) {
                     try {
-                        // 1. Грузим детали вакансии
                         const resDetail = await fetch(`${this.apiUrl}/vacancies/${id}`);
                         this.selectedVacancy = await resDetail.json();
-
-                        // 2. Грузим кандидатов этой вакансии
                         const resCands = await fetch(`${this.apiUrl}/vacancies/${id}/candidates`);
                         this.vacancyCandidates = await resCands.json();
-
-                        // 3. Показываем окно
                         this.showVacancyDetail = true;
-
-                        // 4. Инициализируем Drag & Drop (ждем пока Vue отрисует HTML)
-                        this.$nextTick(() => {
-                            this.initSortable();
-                        });
-
-                    } catch (e) { alert("Ошибка загрузки вакансии"); console.error(e); }
+                        this.$nextTick(() => this.initSortable());
+                    } catch (e) { alert("Ошибка загрузки"); }
                 },
-
                 closeVacancyDetail() {
                     this.showVacancyDetail = false;
-                    this.fetchData(); // Обновляем главную страницу при закрытии
                 },
-
                 vacancyCandidatesByStatus(status) {
                     return this.vacancyCandidates.filter(c => c.status === status);
                 },
-
                 initSortable() {
-                    const columns = document.querySelectorAll('.column-body');
-                    columns.forEach(col => {
+                    document.querySelectorAll('.column-body').forEach(col => {
                         new Sortable(col, {
-                            group: 'kanban', // Разрешаем перетаскивание между колонками
-                            animation: 150,
-                            ghostClass: 'opacity-50', // Прозрачность при перетаскивании
+                            group: 'kanban', animation: 150, ghostClass: 'opacity-50',
                             onEnd: (evt) => {
-                                const itemEl = evt.item;
-                                const newStatus = evt.to.dataset.status;
-                                const candidateId = itemEl.dataset.id;
-                                
-                                // Если перетащили в ту же колонку - ничего не делаем
                                 if (evt.from === evt.to) return;
-
-                                // Обновляем статус
-                                this.updateStatusInKanban(candidateId, newStatus);
+                                this.updateStatus(evt.item.dataset.id, evt.to.dataset.status);
                             }
                         });
                     });
                 },
-
-                async updateStatusInKanban(id, newStatus) {
-                    // Оптимистичное обновление интерфейса (сразу меняем в массиве)
+                async updateStatus(id, newStatus) {
                     const cand = this.vacancyCandidates.find(c => c.id == id);
                     if (cand) cand.status = newStatus;
-
-                    // Шлем запрос на сервер
-                    try {
-                        await fetch(`${this.apiUrl}/candidates/${id}`, {
-                            method: 'PATCH',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ status: newStatus })
-                        });
-                    } catch (e) { 
-                        alert("Ошибка сохранения статуса"); 
-                        console.error(e); 
-                    }
+                    await fetch(`${this.apiUrl}/candidates/${id}`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ status: newStatus })
+                    });
                 },
-
-                // --- ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ---
+                async createVacancy() {
+                    if (!this.newVacancy.title) return;
+                    this.loading = true;
+                    try {
+                        await fetch(`${this.apiUrl}/vacancies/generate`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ title: this.newVacancy.title, requirements: this.newVacancy.requirements, company_id: 1 })
+                        });
+                        this.showModal = false;
+                        this.newVacancy = { title: '', requirements: '' };
+                        this.fetchData();
+                    } finally { this.loading = false; }
+                },
                 getScoreBorderColor(score) {
                     if (score >= 80) return 'border-green-500';
                     if (score >= 50) return 'border-yellow-400';
                     return 'border-red-500';
                 },
-
-                renderChart() {
-                    const ctx = document.getElementById('funnelChart');
-                    if (!ctx) return;
-                    const screening = this.candidates.filter(c => c.status === 'screening').length;
-                    const interview = this.candidates.filter(c => c.status === 'interview').length;
-                    const rejected = this.candidates.filter(c => c.status === 'rejected').length;
-                    if (this.chartInstance) this.chartInstance.destroy();
-                    this.chartInstance = new Chart(ctx, {
-                        type: 'doughnut',
-                        data: {
-                            labels: ['Новые', 'Интервью', 'Отказ'],
-                            datasets: [{
-                                data: [screening, interview, rejected],
-                                backgroundColor: ['#60A5FA', '#4ADE80', '#F87171'],
-                                borderWidth: 0
-                            }]
-                        },
-                        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { boxWidth: 10 } } } }
-                    });
-                },
-
-                getScoreColor(score) {
-                    if (score >= 80) return 'bg-green-500';
-                    if (score >= 50) return 'bg-yellow-400';
-                    return 'bg-red-500';
-                },
-
                 getTextColor(score) {
                     if (score >= 80) return 'text-green-600';
                     if (score >= 50) return 'text-yellow-600';
                     return 'text-red-600';
                 },
 
-                async updateStatus(id, newStatus) {
+                // --- МЕТОДЫ ДЛЯ КАНДИДАТОВ ---
+
+                async loadCandidates() {
                     try {
-                        const response = await fetch(`${this.apiUrl}/candidates/${id}`, {
-                            method: 'PATCH',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ status: newStatus })
+                        const params = new URLSearchParams({
+                            page: this.candidatesList.page,
+                            per_page: 10,
+                            search: this.filters.search,
+                            status: this.filters.status,
+                            vacancy_id: this.filters.vacancy_id
                         });
-                        if (response.ok) {
-                            const candidate = this.candidates.find(c => c.id === id);
-                            if (candidate) candidate.status = newStatus;
-                            this.renderChart();
-                        }
+                        if (!this.filters.search) params.delete('search');
+                        if (!this.filters.status) params.delete('status');
+                        if (!this.filters.vacancy_id) params.delete('vacancy_id');
+
+                        const res = await fetch(`${this.apiUrl}/candidates/search?${params}`);
+                        const data = await res.json();
+                        this.candidatesList = data;
                     } catch (e) { console.error(e); }
                 },
 
-                async createVacancy() {
-                    if (!this.newVacancy.title) return alert("Введите название!");
-                    this.loading = true;
+                async loadCandidatesStats() {
                     try {
-                        const response = await fetch(`${this.apiUrl}/vacancies/generate`, {
+                        const res = await fetch(`${this.apiUrl}/candidates/stats`);
+                        this.candidatesStats = await res.json();
+                    } catch (e) { console.error(e); }
+                },
+
+                debouncedSearch() {
+                    clearTimeout(this.searchTimeout);
+                    this.searchTimeout = setTimeout(() => {
+                        this.candidatesList.page = 1;
+                        this.loadCandidates();
+                    }, 500);
+                },
+
+                resetFilters() {
+                    this.filters = { search: '', status: '', vacancy_id: '' };
+                    this.loadCandidates();
+                },
+
+                goToPage(page) {
+                    if (page >= 1 && page <= this.candidatesList.pages) {
+                        this.candidatesList.page = page;
+                        this.loadCandidates();
+                    }
+                },
+
+                getStatusClass(status) {
+                    const map = {
+                        'new': 'bg-blue-100 text-blue-800',
+                        'screening': 'bg-purple-100 text-purple-800',
+                        'interview': 'bg-yellow-100 text-yellow-800',
+                        'offer': 'bg-orange-100 text-orange-800',
+                        'hired': 'bg-green-100 text-green-800',
+                        'rejected': 'bg-red-100 text-red-800'
+                    };
+                    return map[status] || 'bg-gray-100';
+                },
+                getStatusLabel(status) {
+                    const map = { 'new': 'Новый', 'screening': 'Скрининг', 'interview': 'Интервью', 'offer': 'Оффер', 'hired': 'Нанят', 'rejected': 'Отказ' };
+                    return map[status] || status;
+                },
+                getScoreBgColor(score) {
+                    if (score >= 80) return 'bg-green-100 text-green-800 border-green-200';
+                    if (score >= 50) return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+                    return 'bg-red-100 text-red-800 border-red-200';
+                },
+                
+                exportCandidates() {
+                    alert("Скачивание CSV файла...");
+                },
+
+                // --- МЕТОДЫ ДЛЯ КАРТОЧКИ КАНДИДАТА (НОВОЕ) ---
+
+                async openCandidateCard(id) {
+                    try {
+                        const res = await fetch(`${this.apiUrl}/candidates/${id}/detail`);
+                        if (!res.ok) throw new Error("Err");
+                        this.candidateDetail = await res.json();
+                        this.showCandidateCard = true;
+                    } catch (e) { alert("Ошибка загрузки карточки"); }
+                },
+
+                closeCandidateCard() {
+                    this.showCandidateCard = false;
+                    this.candidateDetail = { comments: [], activities: [], first_name: '' }; // Очищаем
+                },
+
+                async addComment() {
+                    if (!this.newComment.trim()) return;
+                    try {
+                        await fetch(`${this.apiUrl}/candidates/${this.candidateDetail.id}/comments`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                title: this.newVacancy.title,
-                                requirements: this.newVacancy.requirements || "Опыт работы",
-                                company_id: 1
-                            })
+                            body: JSON.stringify({ text: this.newComment })
                         });
-                        if (response.ok) {
-                            this.showModal = false;
-                            this.newVacancy.title = '';
-                            this.newVacancy.requirements = '';
-                            await this.fetchData();
-                        }
-                    } catch (e) { alert("Ошибка сети"); } 
-                    finally { this.loading = false; }
+                        this.newComment = '';
+                        // Перезагружаем данные карточки
+                        this.openCandidateCard(this.candidateDetail.id);
+                    } catch (e) { alert("Ошибка"); }
+                },
+
+                async changeStatusFromCard(newStatus) {
+                    await this.updateStatus(this.candidateDetail.id, newStatus);
+                    // Перезагружаем карточку
+                    this.openCandidateCard(this.candidateDetail.id);
+                    // Обновляем таблицу на фоне
+                    this.loadCandidates();
                 }
             },
             mounted() {
