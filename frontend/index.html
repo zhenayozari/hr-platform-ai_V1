@@ -29,7 +29,6 @@
                 </div>
                 <div v-if="authError" class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4 text-sm">{{ authError }}</div>
                 
-                <!-- Логин -->
                 <div v-if="authMode === 'login'" class="space-y-4">
                     <input v-model="authForm.email" type="email" class="w-full px-4 py-3 border rounded-lg outline-none" placeholder="Email">
                     <input v-model="authForm.password" type="password" class="w-full px-4 py-3 border rounded-lg outline-none" placeholder="Пароль" @keyup.enter="login">
@@ -37,7 +36,6 @@
                     <p class="text-center text-sm text-gray-500">Нет аккаунта? <a @click="authMode = 'register'" class="text-blue-600 hover:underline cursor-pointer">Регистрация</a></p>
                 </div>
 
-                <!-- Регистрация -->
                 <div v-if="authMode === 'register'" class="space-y-4">
                     <div class="grid grid-cols-2 gap-4">
                         <input v-model="authForm.first_name" type="text" class="w-full px-4 py-3 border rounded-lg outline-none" placeholder="Имя">
@@ -61,11 +59,12 @@
                             <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-700 rounded-lg flex items-center justify-center text-white font-bold shadow-lg">HR</div>
                             <div>
                                 <h1 class="text-xl font-bold text-gray-800 leading-tight">HR Platform</h1>
-                                <p class="text-xs text-gray-500">{{ currentUser?.company_name }}</p>
+                                <p class="text-xs text-gray-500">{{ companyProfile.name || currentUser?.company_name }}</p>
                             </div>
                         </div>
                         <div class="flex items-center gap-4">
-                            <div class="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-lg border">
+                            <!-- КЛИКАБЕЛЬНЫЙ ПРОФИЛЬ -->
+                            <div @click="currentTab = 'settings'; loadSettings()" class="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-lg border cursor-pointer hover:bg-gray-100 transition">
                                 <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold">{{ currentUser?.first_name[0] }}</div>
                                 <div class="text-sm hidden md:block">
                                     <div class="font-medium text-gray-700">{{ currentUser?.first_name }} {{ currentUser?.last_name }}</div>
@@ -81,6 +80,8 @@
                         <button @click="currentTab = 'dashboard'; loadDashboard()" :class="['py-3 text-sm font-medium border-b-2 transition-colors', currentTab === 'dashboard' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700']">Дашборд</button>
                         <button @click="currentTab = 'vacancies'; fetchData()" :class="['py-3 text-sm font-medium border-b-2 transition-colors', currentTab === 'vacancies' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700']">Вакансии</button>
                         <button @click="currentTab = 'candidates'; loadCandidates()" :class="['py-3 text-sm font-medium border-b-2 transition-colors', currentTab === 'candidates' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700']">Кандидаты</button>
+                        <!-- ВЕРНУЛИ КНОПКУ НАСТРОЕК -->
+                        <button @click="currentTab = 'settings'; loadSettings()" :class="['py-3 text-sm font-medium border-b-2 transition-colors', currentTab === 'settings' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700']">Настройки</button>
                     </nav>
                 </div>
             </header>
@@ -173,6 +174,39 @@
                         </table>
                     </div>
                 </div>
+
+                <!-- 4. НАСТРОЙКИ (ВЕРНУЛИ!) -->
+                <div v-if="currentTab === 'settings'" class="space-y-6">
+                    <div class="bg-white rounded-lg shadow-sm border">
+                        <div class="border-b px-4">
+                            <nav class="flex gap-4">
+                                <button @click="settingsSubTab = 'company'" :class="['py-3 text-sm font-medium border-b-2 transition', settingsSubTab === 'company' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500']">🏢 Компания</button>
+                                <button @click="settingsSubTab = 'users'; loadUsers()" :class="['py-3 text-sm font-medium border-b-2 transition', settingsSubTab === 'users' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500']">👥 Пользователи</button>
+                            </nav>
+                        </div>
+                        <div class="p-6">
+                            <!-- Профиль компании -->
+                            <div v-if="settingsSubTab === 'company'" class="max-w-2xl">
+                                <h2 class="text-xl font-bold mb-6">Профиль компании</h2>
+                                <div class="space-y-4">
+                                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Название</label><input v-model="companyProfile.name" type="text" class="w-full border rounded-lg px-4 py-2"></div>
+                                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Описание</label><textarea v-model="companyProfile.description" rows="3" class="w-full border rounded-lg px-4 py-2"></textarea></div>
+                                    <button @click="saveCompanyProfile" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">Сохранить</button>
+                                </div>
+                            </div>
+                            <!-- Пользователи -->
+                            <div v-if="settingsSubTab === 'users'">
+                                <div class="flex justify-between items-center mb-6"><h2 class="text-xl font-bold">Пользователи</h2><button @click="showAddUserModal = true" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700"><i class="fas fa-plus mr-2"></i>Добавить</button></div>
+                                <div class="bg-white border rounded-lg overflow-hidden">
+                                    <table class="w-full"><thead class="bg-gray-50 border-b"><tr><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Пользователь</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Роль</th><th class="px-6 py-3"></th></tr></thead>
+                                        <tbody class="divide-y"><tr v-for="user in companyUsers" :key="user.id" class="hover:bg-gray-50"><td class="px-6 py-4"><div class="font-medium">{{ user.first_name }} {{ user.last_name }}</div><div class="text-sm text-gray-500">{{ user.email }}</div></td><td class="px-6 py-4">{{ user.role }}</td><td class="px-6 py-4 text-right"><button v-if="user.id !== currentUser.id" @click="deactivateUser(user.id)" class="text-red-500 hover:text-red-700 text-sm">Удалить</button></td></tr></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
             </main>
         </div>
 
@@ -187,6 +221,24 @@
                 <div class="flex justify-end gap-2">
                     <button @click="showModal = false" class="text-gray-500 px-4 py-2 hover:bg-gray-100 rounded">Отмена</button>
                     <button @click="createVacancy" :disabled="loading" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 flex items-center"><span v-if="loading">AI...</span><span v-else>Создать</span></button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Добавление пользователя -->
+        <div v-if="showAddUserModal" class="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+            <div class="bg-white p-6 rounded-lg shadow-xl w-96">
+                <h2 class="text-xl font-bold mb-4">Добавить пользователя</h2>
+                <div class="space-y-3">
+                    <input v-model="newUser.first_name" placeholder="Имя" class="w-full border p-2 rounded">
+                    <input v-model="newUser.last_name" placeholder="Фамилия" class="w-full border p-2 rounded">
+                    <input v-model="newUser.email" placeholder="Email" class="w-full border p-2 rounded">
+                    <input v-model="newUser.password" placeholder="Пароль" class="w-full border p-2 rounded">
+                    <select v-model="newUser.role" class="w-full border p-2 rounded"><option value="recruiter">Рекрутер</option><option value="admin">Админ</option></select>
+                </div>
+                <div class="flex justify-end gap-2 mt-4">
+                    <button @click="showAddUserModal = false" class="text-gray-500 px-4 py-2">Отмена</button>
+                    <button @click="createUser" class="bg-green-600 text-white px-4 py-2 rounded">Добавить</button>
                 </div>
             </div>
         </div>
@@ -265,6 +317,13 @@
                     candidatesList: { items: [], total: 0, page: 1, pages: 1 },
                     filters: { search: '', status: '', vacancy_id: '' },
                     
+                    // Настройки
+                    settingsSubTab: 'company',
+                    companyProfile: {},
+                    companyUsers: [],
+                    showAddUserModal: false,
+                    newUser: { first_name: '', last_name: '', email: '', password: '', role: 'recruiter' },
+                    
                     // Модалки
                     showModal: false,
                     showVacancyDetail: false,
@@ -298,7 +357,8 @@
                         this.authToken = token;
                         this.currentUser = JSON.parse(user);
                         this.isAuthenticated = true;
-                        this.loadDashboard(); // Загружаем данные сразу
+                        this.loadDashboard();
+                        this.loadSettings(); // Загружаем настройки сразу
                     }
                 },
                 async login() {
@@ -322,6 +382,7 @@
                     localStorage.setItem('hr_token', data.access_token);
                     localStorage.setItem('hr_user', JSON.stringify(data.user));
                     this.loadDashboard();
+                    this.loadSettings();
                 },
                 logout() {
                     this.isAuthenticated = false;
@@ -359,6 +420,32 @@
                         const res = await this.apiFetch(`${this.apiUrl}/candidates/search?${params}`);
                         this.candidatesList = await res.json();
                     } catch (e) {}
+                },
+                // --- SETTINGS ---
+                async loadSettings() {
+                    this.loadCompanyProfile();
+                },
+                async loadCompanyProfile() {
+                    const res = await this.apiFetch(`${this.apiUrl}/settings/company`);
+                    this.companyProfile = await res.json();
+                },
+                async saveCompanyProfile() {
+                    await this.apiFetch(`${this.apiUrl}/settings/company`, { method: 'PATCH', body: JSON.stringify(this.companyProfile) });
+                    alert('Сохранено!');
+                },
+                async loadUsers() {
+                    const res = await this.apiFetch(`${this.apiUrl}/settings/users`);
+                    this.companyUsers = await res.json();
+                },
+                async createUser() {
+                    await this.apiFetch(`${this.apiUrl}/settings/users`, { method: 'POST', body: JSON.stringify(this.newUser) });
+                    this.showAddUserModal = false;
+                    this.loadUsers();
+                },
+                async deactivateUser(id) {
+                    if(!confirm('Удалить?')) return;
+                    await this.apiFetch(`${this.apiUrl}/settings/users/${id}`, { method: 'DELETE' });
+                    this.loadUsers();
                 },
                 // --- ACTIONS ---
                 async createVacancy() {

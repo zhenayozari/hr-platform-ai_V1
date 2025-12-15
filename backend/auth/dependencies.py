@@ -24,11 +24,17 @@ async def get_current_user(
     
     # Извлекаем user_id
     try:
-        user_id = int(payload.get("sub")) # <--- Превращаем строку обратно в число
+        user_id = int(payload.get("sub"))
     except (ValueError, TypeError):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Некорректный ID пользователя в токене",
+            detail="Некорректный ID пользователя",
+        )
+
+    if user_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Токен не содержит ID пользователя",
         )
     
     # Находим пользователя
@@ -47,7 +53,32 @@ async def get_current_user(
     
     return user
 
-# Вспомогательная функция для проверки доступа к компании
+# --- ФУНКЦИИ ПРОВЕРКИ РОЛЕЙ (ИХ НЕ ХВАТАЛО) ---
+
+async def get_current_active_admin(
+    current_user: User = Depends(get_current_user)
+) -> User:
+    """Проверяет, что пользователь — администратор"""
+    if current_user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Недостаточно прав. Требуется роль admin.",
+        )
+    return current_user
+
+async def get_current_recruiter_or_admin(
+    current_user: User = Depends(get_current_user)
+) -> User:
+    """Проверяет, что пользователь — рекрутер или админ"""
+    if current_user.role not in ["admin", "recruiter"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Недостаточно прав.",
+        )
+    return current_user
+
+# --- ПРОВЕРКА ДОСТУПА К КОМПАНИИ ---
+
 def check_company_access(obj, current_user: User, obj_name: str = "Объект"):
     if obj is None:
         raise HTTPException(
