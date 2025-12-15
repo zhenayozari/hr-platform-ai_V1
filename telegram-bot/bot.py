@@ -29,7 +29,8 @@ async def get_vacancies(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # trust_env=False важно для работы на Windows без прокси проблем
     async with httpx.AsyncClient(trust_env=False) as client:
         try:
-            response = await client.get(f"{API_URL}/vacancies/")
+            # Стучимся в публичный эндпоинт
+            response = await client.get(f"{API_URL}/public/vacancies")
             vacancies = response.json()
             
             if not vacancies:

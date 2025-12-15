@@ -10,10 +10,22 @@ class Company(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, unique=True, index=True)
     
+    # Новые поля для настроек
+    description = Column(Text, nullable=True)
+    website = Column(String, nullable=True)
+    logo_url = Column(String, nullable=True)
+    contact_email = Column(String, nullable=True)
+    contact_phone = Column(String, nullable=True)
+    address = Column(String, nullable=True)
+    
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
     # Связи
     users = relationship("User", back_populates="company")
     vacancies = relationship("Vacancy", back_populates="company")
     candidates = relationship("Candidate", back_populates="company")
+    pipeline_stages = relationship("PipelineStage", back_populates="company", order_by="PipelineStage.order")
+    email_templates = relationship("EmailTemplate", back_populates="company")
 
 class User(Base):
     __tablename__ = "users"
@@ -22,7 +34,7 @@ class User(Base):
     hashed_password = Column(String, nullable=False)
     first_name = Column(String, nullable=True)
     last_name = Column(String, nullable=True)
-    role = Column(String, default="recruiter") # admin, recruiter
+    role = Column(String, default="recruiter")
     is_active = Column(Boolean, default=True)
     
     company_id = Column(Integer, ForeignKey("companies.id"), nullable=False)
@@ -65,11 +77,8 @@ class Candidate(Base):
     
     created_at = Column(DateTime, default=datetime.utcnow)
     
-    # Связи для истории и комментов
     comments = relationship("CandidateComment", back_populates="candidate", order_by="desc(CandidateComment.created_at)")
     activities = relationship("CandidateActivity", back_populates="candidate", order_by="desc(CandidateActivity.created_at)")
-
-# --- НОВЫЕ ТАБЛИЦЫ ---
 
 class CandidateComment(Base):
     __tablename__ = "candidate_comments"
@@ -78,7 +87,6 @@ class CandidateComment(Base):
     author_name = Column(String)
     text = Column(Text)
     created_at = Column(DateTime, default=datetime.utcnow)
-    
     candidate = relationship("Candidate", back_populates="comments")
 
 class CandidateActivity(Base):
@@ -88,5 +96,31 @@ class CandidateActivity(Base):
     action = Column(String)
     description = Column(Text)
     created_at = Column(DateTime, default=datetime.utcnow)
-    
     candidate = relationship("Candidate", back_populates="activities")
+
+# --- НОВЫЕ ТАБЛИЦЫ ДЛЯ НАСТРОЕК ---
+
+class PipelineStage(Base):
+    __tablename__ = "pipeline_stages"
+    id = Column(Integer, primary_key=True, index=True)
+    company_id = Column(Integer, ForeignKey("companies.id"), nullable=False)
+    key = Column(String, nullable=False)
+    label = Column(String, nullable=False)
+    color = Column(String, default="#3B82F6")
+    order = Column(Integer, default=0)
+    is_active = Column(Boolean, default=True)
+    is_final = Column(Boolean, default=False)
+    company = relationship("Company", back_populates="pipeline_stages")
+
+class EmailTemplate(Base):
+    __tablename__ = "email_templates"
+    id = Column(Integer, primary_key=True, index=True)
+    company_id = Column(Integer, ForeignKey("companies.id"), nullable=False)
+    type = Column(String, nullable=False)
+    name = Column(String, nullable=False)
+    subject = Column(String, nullable=False)
+    body = Column(Text, nullable=False)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    company = relationship("Company", back_populates="email_templates")

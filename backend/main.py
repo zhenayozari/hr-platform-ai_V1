@@ -8,13 +8,15 @@ import os
 import httpx
 
 from .database import get_db, init_db
-from .models import Vacancy, Candidate, Company, User, CandidateActivity, CandidateComment
+from .models import Vacancy, Candidate, Company, User, CandidateActivity, CandidateComment, PipelineStage, EmailTemplate
 from .ai import analyze_resume_with_gpt, generate_vacancy_description
 
 # Auth
 from .auth.router import router as auth_router
 from .auth.dependencies import get_current_user, check_company_access
 
+# Settings
+from .routers.settings import router as settings_router
 app = FastAPI(
     title="HR Платформа API v2.0",
     description="API с авторизацией и мультитенантностью",
@@ -30,6 +32,8 @@ app.add_middleware(
 )
 
 app.include_router(auth_router)
+
+app.include_router(settings_router)
 
 @app.on_event("startup")
 def on_startup():
@@ -180,6 +184,15 @@ def generate_vacancy(
     db.refresh(db_vacancy)
     return db_vacancy
 
+# --- ПУБЛИЧНЫЙ ЭНДПОИНТ ДЛЯ БОТА ---
+@app.get("/public/vacancies", response_model=List[VacancyResponse])
+def get_public_vacancies(db: Session = Depends(get_db)):
+    """
+    Отдает все активные вакансии всех компаний.
+    Нужен для Telegram-бота, чтобы кандидаты могли выбирать работу.
+    """
+    return db.query(Vacancy).filter(Vacancy.status == "active").all()
+
 @app.get("/vacancies/", response_model=List[VacancyResponse])
 def read_vacancies(
     skip: int = 0, 
@@ -263,10 +276,10 @@ def apply_candidate(application: CandidateApply, db: Session = Depends(get_db)):
         email="tg_user@example.com",
         resume_text=application.resume_text,
         vacancy_id=application.vacancy_id,
-        company_id=vacancy.company_id, # Берем ID компании из вакансии!
+        company_id=vacancy.company_id, 
         ai_score=ai_result.get("score", 0),
         ai_summary=ai_result.get("summary", "Ошибка анализа"),
-        status="new", # Сразу "new"
+        status="new",
         source="telegram"
     )
     
@@ -282,33 +295,19 @@ def apply_candidate(application: CandidateApply, db: Session = Depends(get_db)):
     
     db.commit()
     db.refresh(db_candidate)
-    return db_candidate
-
-@app.get("/candidates/", response_model=List[CandidateResponse])
-def read_candidates(
-    skip: int = 0, 
-    limit: int = 100, 
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    candidates = db.query(Candidate).filter(
-        Candidate.company_id == current_user.company_id
-    ).offset(skip).limit(limit).all()
     
-    result = []
-    for c in candidates:
-        vac_title = c.vacancy.title if c.vacancy else "Архив"
-        result.append({
-            "id": c.id,
-            "ai_score": c.ai_score,
-            "ai_summary": c.ai_summary,
-            "status": c.status,
-            "first_name": c.first_name,
-            "last_name": c.last_name,
-            "vacancy_id": c.vacancy_id,
-            "vacancy_title": vac_title,
-            "created_at": c.created_at
-        })
+    # --- ИСПРАВЛЕНИЕ: Возвращаем словарь с явным указанием vacancy_title ---
+    return {
+        "id": db_candidate.id,
+        "ai_score": db_candidate.ai_score,
+        "ai_summary": db_candidate.ai_summary,
+        "status": db_candidate.status,
+        "first_name": db_candidate.first_name,
+        "last_name": db_candidate.last_name,
+        "vacancy_id": db_candidate.vacancy_id,
+        "vacancy_title": vacancy.title, # <--- Вот чего не хватало!
+        "created_at": db_candidate.created_at
+    }
     return result
 
 # ПОИСК КАНДИДАТОВ (Для вкладки "Кандидаты")
