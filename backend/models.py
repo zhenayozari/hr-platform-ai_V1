@@ -60,8 +60,33 @@ class Candidate(Base):
     vacancy_id = Column(Integer, ForeignKey("vacancies.id"))
     vacancy = relationship("Vacancy", back_populates="candidates")
     
-    # Важно: кандидат тоже принадлежит компании!
     company_id = Column(Integer, ForeignKey("companies.id"), nullable=False)
     company = relationship("Company", back_populates="candidates")
     
     created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Связи для истории и комментов
+    comments = relationship("CandidateComment", back_populates="candidate", order_by="desc(CandidateComment.created_at)")
+    activities = relationship("CandidateActivity", back_populates="candidate", order_by="desc(CandidateActivity.created_at)")
+
+# --- НОВЫЕ ТАБЛИЦЫ ---
+
+class CandidateComment(Base):
+    __tablename__ = "candidate_comments"
+    id = Column(Integer, primary_key=True, index=True)
+    candidate_id = Column(Integer, ForeignKey("candidates.id"))
+    author_name = Column(String)
+    text = Column(Text)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    candidate = relationship("Candidate", back_populates="comments")
+
+class CandidateActivity(Base):
+    __tablename__ = "candidate_activities"
+    id = Column(Integer, primary_key=True, index=True)
+    candidate_id = Column(Integer, ForeignKey("candidates.id"))
+    action = Column(String)
+    description = Column(Text)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    candidate = relationship("Candidate", back_populates="activities")
