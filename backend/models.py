@@ -9,17 +9,27 @@ class Company(Base):
     __tablename__ = "companies"
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, unique=True, index=True)
+    
+    # Связи
     users = relationship("User", back_populates="company")
     vacancies = relationship("Vacancy", back_populates="company")
+    candidates = relationship("Candidate", back_populates="company")
 
 class User(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True, index=True)
-    email = Column(String, unique=True, index=True)
-    hashed_password = Column(String)
-    role = Column(String)
-    company_id = Column(Integer, ForeignKey("companies.id"))
+    email = Column(String, unique=True, index=True, nullable=False)
+    hashed_password = Column(String, nullable=False)
+    first_name = Column(String, nullable=True)
+    last_name = Column(String, nullable=True)
+    role = Column(String, default="recruiter") # admin, recruiter
+    is_active = Column(Boolean, default=True)
+    
+    company_id = Column(Integer, ForeignKey("companies.id"), nullable=False)
     company = relationship("Company", back_populates="users")
+    
+    created_at = Column(DateTime, default=datetime.utcnow)
+    last_login = Column(DateTime, nullable=True)
 
 class Vacancy(Base):
     __tablename__ = "vacancies"
@@ -28,7 +38,8 @@ class Vacancy(Base):
     description = Column(Text)
     requirements = Column(Text)
     status = Column(String, default="active")
-    company_id = Column(Integer, ForeignKey("companies.id"))
+    
+    company_id = Column(Integer, ForeignKey("companies.id"), nullable=False)
     company = relationship("Company", back_populates="vacancies")
     candidates = relationship("Candidate", back_populates="vacancy")
 
@@ -38,39 +49,19 @@ class Candidate(Base):
     first_name = Column(String)
     last_name = Column(String)
     email = Column(String)
-    phone = Column(String, nullable=True)  # НОВОЕ
+    phone = Column(String, nullable=True)
     telegram_id = Column(String, nullable=True)
     resume_text = Column(Text)
     ai_score = Column(Float, default=0.0)
     ai_summary = Column(Text, nullable=True)
     status = Column(String, default="new")
-    source = Column(String, default="manual")  # НОВОЕ (hh.ru, telegram, manual)
+    source = Column(String, default="manual")
+    
     vacancy_id = Column(Integer, ForeignKey("vacancies.id"))
     vacancy = relationship("Vacancy", back_populates="candidates")
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow) # НОВОЕ
     
-    # Связи для Пункта 5
-    comments = relationship("CandidateComment", back_populates="candidate", order_by="desc(CandidateComment.created_at)")
-    activities = relationship("CandidateActivity", back_populates="candidate", order_by="desc(CandidateActivity.created_at)")
-
-# НОВЫЕ ТАБЛИЦЫ ДЛЯ ПУНКТА 5
-class CandidateComment(Base):
-    __tablename__ = "candidate_comments"
-    id = Column(Integer, primary_key=True, index=True)
-    candidate_id = Column(Integer, ForeignKey("candidates.id"))
-    author_name = Column(String)
-    text = Column(Text)
+    # Важно: кандидат тоже принадлежит компании!
+    company_id = Column(Integer, ForeignKey("companies.id"), nullable=False)
+    company = relationship("Company", back_populates="candidates")
+    
     created_at = Column(DateTime, default=datetime.utcnow)
-    candidate = relationship("Candidate", back_populates="comments")
-
-class CandidateActivity(Base):
-    __tablename__ = "candidate_activities"
-    id = Column(Integer, primary_key=True, index=True)
-    candidate_id = Column(Integer, ForeignKey("candidates.id"))
-    action = Column(String)
-    description = Column(Text)
-    old_value = Column(String, nullable=True)
-    new_value = Column(String, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    candidate = relationship("Candidate", back_populates="activities")
