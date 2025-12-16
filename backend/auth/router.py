@@ -65,6 +65,7 @@ def register(data: UserRegister, db: Session = Depends(get_db)):
         db.add(company)
         db.commit()
         db.refresh(company)
+        is_new_company = True # Компания новая
     
     # Определяем роль: первый пользователь компании = admin
     existing_users_count = db.query(User).filter(User.company_id == company.id).count()
@@ -83,6 +84,12 @@ def register(data: UserRegister, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(user)
     
+    if is_new_company:
+        # Импортируем функции создания дефолтов
+        from ..routers.settings import create_default_pipeline_stages, create_default_email_templates
+        create_default_pipeline_stages(db, company.id)
+        create_default_email_templates(db, company.id)
+
     # Создаём токен
     access_token = create_access_token(
         data={"sub": str(user.id)},

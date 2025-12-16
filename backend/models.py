@@ -10,15 +10,12 @@ class Company(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, unique=True, index=True)
     
-    # Новые поля для настроек
+    # Поля профиля
     description = Column(Text, nullable=True)
     website = Column(String, nullable=True)
-    logo_url = Column(String, nullable=True)
     contact_email = Column(String, nullable=True)
     contact_phone = Column(String, nullable=True)
     address = Column(String, nullable=True)
-    
-    created_at = Column(DateTime, default=datetime.utcnow)
     
     # Связи
     users = relationship("User", back_populates="company")
@@ -98,7 +95,7 @@ class CandidateActivity(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     candidate = relationship("Candidate", back_populates="activities")
 
-# --- НОВЫЕ ТАБЛИЦЫ ДЛЯ НАСТРОЕК ---
+# --- НОВЫЕ ТАБЛИЦЫ (ИЗ-ЗА НИХ БЫЛА ОШИБКА) ---
 
 class PipelineStage(Base):
     __tablename__ = "pipeline_stages"
