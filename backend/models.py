@@ -48,6 +48,14 @@ class Vacancy(Base):
     requirements = Column(Text)
     status = Column(String, default="active")
     
+    # --- НОВЫЕ ПОЛЯ ---
+    salary_min = Column(Integer, nullable=True)
+    salary_max = Column(Integer, nullable=True)
+    experience = Column(String, nullable=True) # junior, middle, senior, no_exp
+    employment_type = Column(String, nullable=True) # full_time, part_time, remote
+    city = Column(String, nullable=True)
+    # ------------------
+    
     company_id = Column(Integer, ForeignKey("companies.id"), nullable=False)
     company = relationship("Company", back_populates="vacancies")
     candidates = relationship("Candidate", back_populates="vacancy")
@@ -94,8 +102,6 @@ class CandidateActivity(Base):
     description = Column(Text)
     created_at = Column(DateTime, default=datetime.utcnow)
     candidate = relationship("Candidate", back_populates="activities")
-
-# --- НОВЫЕ ТАБЛИЦЫ (ИЗ-ЗА НИХ БЫЛА ОШИБКА) ---
 
 class PipelineStage(Base):
     __tablename__ = "pipeline_stages"

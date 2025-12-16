@@ -32,7 +32,8 @@ class CompanyResponse(BaseModel):
     contact_email: Optional[str] = None
     contact_phone: Optional[str] = None
     address: Optional[str] = None
-    created_at: datetime
+    # ВАЖНО: Делаем дату необязательной (Optional), чтобы не было ошибки 500
+    created_at: Optional[datetime] = None
     
     class Config:
         from_attributes = True

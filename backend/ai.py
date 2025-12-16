@@ -62,18 +62,21 @@ def analyze_resume_with_gpt(resume_text: str, vacancy_description: str):
             "cons": ["Ошибка сервиса"]
         }
     
-def generate_vacancy_description(title: str, requirements: str):
+def generate_vacancy_description(title: str, requirements: str, salary: str = "", city: str = "", experience: str = ""):
     prompt = f"""
-    Ты профессиональный HR-менеджер. Напиши привлекательное описание вакансии.
+    Ты профессиональный HR. Напиши описание вакансии.
     
     Должность: {title}
-    Ключевые требования: {requirements}
+    Требования: {requirements}
+    Зарплата: {salary}
+    Город: {city}
+    Опыт: {experience}
     
     Верни ответ ТОЛЬКО в формате JSON:
     {{
-        "description": "<вводная часть, чем предстоит заниматься, 2-3 предложения>",
+        "description": "<вводная часть, чем заниматься, 2-3 предложения. Упомяни город и зарплату, если они достойные>",
         "requirements": "<список требований, bullet points>",
-        "conditions": "<список условий (удаленка, дмс и т.д.)>"
+        "conditions": "<список условий (офис/удаленка, плюшки)>"
     }}
     """
 
@@ -84,9 +87,8 @@ def generate_vacancy_description(title: str, requirements: str):
                 {"role": "system", "content": "You are a helpful HR assistant. Output JSON only."},
                 {"role": "user", "content": prompt}
             ],
-            temperature=0.7 # Чуть больше креатива
+            temperature=0.7
         )
-        
         content = response.choices[0].message.content
         content = content.replace("```json", "").replace("```", "").strip()
         return json.loads(content)
@@ -96,4 +98,4 @@ def generate_vacancy_description(title: str, requirements: str):
             "description": "Описание не сгенерировано.",
             "requirements": requirements,
             "conditions": "Стандартные условия."
-        }    
+        }

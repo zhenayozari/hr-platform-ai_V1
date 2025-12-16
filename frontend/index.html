@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HR Platform v2.0</title>
+    <title>HR Platform v2.1</title>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -101,9 +101,17 @@
 
                 <!-- 2. ВАКАНСИИ -->
                 <div v-if="currentTab === 'vacancies'">
-                    <div class="flex justify-between items-center mb-6"><h2 class="text-2xl font-bold text-gray-800">Активные вакансии</h2><button @click="showModal = true" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 shadow transition flex items-center"><i class="fas fa-plus mr-2"></i> Создать вакансию</button></div>
+                    <div class="flex justify-between items-center mb-6"><h2 class="text-2xl font-bold text-gray-800">Активные вакансии</h2><button @click="openCreateVacancyModal" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 shadow transition flex items-center"><i class="fas fa-plus mr-2"></i> Создать вакансию</button></div>
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        <div v-for="vac in vacancies" :key="vac.id" @click="openVacancy(vac.id)" class="bg-white p-5 rounded-xl shadow-sm border hover:shadow-md cursor-pointer transition group"><div class="flex justify-between items-start mb-2"><h3 class="font-bold text-lg text-gray-800 group-hover:text-blue-600 transition">{{ vac.title }}</h3><span class="bg-green-100 text-green-700 text-xs px-2 py-1 rounded-full font-medium">Active</span></div><p class="text-sm text-gray-500 line-clamp-2 mb-4">{{ vac.description }}</p><div class="flex justify-between items-center text-xs text-gray-400 border-t pt-3"><span>ID: {{ vac.id }}</span><span>Кликните для деталей →</span></div></div>
+                        <div v-for="vac in vacancies" :key="vac.id" @click="openVacancy(vac.id)" class="bg-white p-5 rounded-xl shadow-sm border hover:shadow-md cursor-pointer transition group relative">
+                            <div class="flex justify-between items-start mb-2"><h3 class="font-bold text-lg text-gray-800 group-hover:text-blue-600 transition">{{ vac.title }}</h3><span class="bg-green-100 text-green-700 text-xs px-2 py-1 rounded-full font-medium">Active</span></div>
+                            <p class="text-sm text-gray-500 line-clamp-2 mb-4">{{ vac.description }}</p>
+                            <div class="flex justify-between items-center text-xs text-gray-400 border-t pt-3">
+                                <span>ID: {{ vac.id }}</span>
+                                <!-- Кнопка редактирования -->
+                                <button @click.stop="openEditVacancyModal(vac)" class="text-blue-500 hover:text-blue-700 font-medium z-10"><i class="fas fa-edit mr-1"></i>Ред.</button>
+                            </div>
+                        </div>
                     </div>
                     <div v-if="vacancies.length === 0" class="text-center py-20 text-gray-400">Нет активных вакансий. Создайте первую!</div>
                 </div>
@@ -143,8 +151,67 @@
 
         <!-- МОДАЛЬНЫЕ ОКНА -->
         
-        <!-- Создание вакансии -->
-        <div v-if="showModal" class="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50"><div class="bg-white p-6 rounded-lg shadow-xl w-96"><h2 class="text-xl font-bold mb-4">✨ Создать вакансию</h2><div class="mb-4"><label class="block text-sm font-bold mb-1">Должность</label><input v-model="newVacancy.title" type="text" class="w-full border p-2 rounded"></div><div class="mb-4"><label class="block text-sm font-bold mb-1">Навыки</label><textarea v-model="newVacancy.requirements" class="w-full border p-2 rounded"></textarea></div><div class="flex justify-end gap-2"><button @click="showModal = false" class="text-gray-500 px-4 py-2 hover:bg-gray-100 rounded">Отмена</button><button @click="createVacancy" :disabled="loading" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"><span v-if="loading">AI...</span><span v-else>Создать</span></button></div></div></div>
+        <!-- Создание/Редактирование вакансии -->
+        <div v-if="showModal" class="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 overflow-auto py-5">
+            <div class="bg-white p-6 rounded-lg shadow-xl w-full max-w-2xl mx-4">
+                <h2 class="text-xl font-bold mb-4">{{ isEditingVacancy ? 'Редактировать вакансию' : 'Создать вакансию' }}</h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label class="block text-sm font-bold mb-1">Должность *</label>
+                        <input v-model="newVacancy.title" type="text" class="w-full border p-2 rounded" placeholder="Например: Python Developer">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-bold mb-1">Город</label>
+                        <input v-model="newVacancy.city" type="text" class="w-full border p-2 rounded" placeholder="Москва / Удаленно">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                    <div>
+                        <label class="block text-sm font-bold mb-1">Зарплата от</label>
+                        <input v-model.number="newVacancy.salary_min" type="number" class="w-full border p-2 rounded" placeholder="100000">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-bold mb-1">Зарплата до</label>
+                        <input v-model.number="newVacancy.salary_max" type="number" class="w-full border p-2 rounded" placeholder="200000">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-bold mb-1">Опыт</label>
+                        <select v-model="newVacancy.experience" class="w-full border p-2 rounded">
+                            <option value="">Не важно</option>
+                            <option value="no_exp">Нет опыта</option>
+                            <option value="1-3">1-3 года</option>
+                            <option value="3-6">3-6 лет</option>
+                            <option value="6+">Более 6 лет</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <label class="block text-sm font-bold mb-1">Ключевые навыки *</label>
+                    <textarea v-model="newVacancy.requirements" class="w-full border p-2 rounded" rows="3" placeholder="Python, SQL, Docker..."></textarea>
+                </div>
+
+                <div class="mb-4">
+                    <div class="flex justify-between items-center mb-1">
+                        <label class="block text-sm font-bold">Описание</label>
+                        <button v-if="!isEditingVacancy" @click="generateDescription" :disabled="loading" class="text-xs text-blue-600 hover:underline">
+                            ✨ Сгенерировать AI
+                        </button>
+                    </div>
+                    <textarea v-model="newVacancy.description" class="w-full border p-2 rounded" rows="6" placeholder="Описание вакансии..."></textarea>
+                </div>
+
+                <div class="flex justify-end gap-2">
+                    <button @click="showModal = false" class="text-gray-500 px-4 py-2 hover:bg-gray-100 rounded">Отмена</button>
+                    <button @click="saveVacancy" :disabled="loading" class="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 flex items-center">
+                        <span v-if="loading"><i class="fas fa-spinner fa-spin mr-2"></i>Сохранение...</span>
+                        <span v-else>{{ isEditingVacancy ? 'Сохранить' : 'Создать' }}</span>
+                    </button>
+                </div>
+            </div>
+        </div>
 
         <!-- Добавление пользователя -->
         <div v-if="showAddUserModal" class="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50"><div class="bg-white p-6 rounded-lg shadow-xl w-96"><h2 class="text-xl font-bold mb-4">Добавить пользователя</h2><div class="space-y-3"><input v-model="newUser.first_name" placeholder="Имя" class="w-full border p-2 rounded"><input v-model="newUser.last_name" placeholder="Фамилия" class="w-full border p-2 rounded"><input v-model="newUser.email" placeholder="Email" class="w-full border p-2 rounded"><input v-model="newUser.password" placeholder="Пароль" type="password" class="w-full border p-2 rounded"><select v-model="newUser.role" class="w-full border p-2 rounded"><option value="recruiter">Рекрутер</option><option value="admin">Админ</option></select></div><div class="flex justify-end gap-2 mt-4"><button @click="showAddUserModal = false" class="text-gray-500 px-4 py-2">Отмена</button><button @click="createUser" class="bg-green-600 text-white px-4 py-2 rounded">Добавить</button></div></div></div>
@@ -183,7 +250,13 @@
                     templateForm: { type: 'custom', name: '', subject: '', body: '' }, templatePreview: null,
                     templateTypes: [{ value: 'invitation', label: 'Приглашение' }, { value: 'rejection', label: 'Отказ' }, { value: 'offer', label: 'Оффер' }, { value: 'custom', label: 'Пользовательский' }],
                     showModal: false, showVacancyDetail: false, showCandidateCard: false, loading: false,
-                    newVacancy: { title: '', requirements: '' }, selectedVacancy: {}, vacancyCandidates: [],
+                    
+                    // ВАКАНСИИ (НОВЫЕ ПОЛЯ)
+                    newVacancy: { title: '', requirements: '', description: '', salary_min: null, salary_max: null, experience: '', city: '' },
+                    isEditingVacancy: false, // Флаг редактирования
+                    editingVacancyId: null,
+                    
+                    selectedVacancy: {}, vacancyCandidates: [],
                     candidateDetail: { comments: [], activities: [] }, newComment: '',
                     defaultStatuses: [{ key: 'new', label: 'Новый', color: '#3B82F6' }, { key: 'screening', label: 'Скрининг', color: '#8B5CF6' }, { key: 'interview', label: 'Интервью', color: '#F59E0B' }, { key: 'offer', label: 'Оффер', color: '#F97316' }, { key: 'hired', label: 'Нанят', color: '#10B981' }, { key: 'rejected', label: 'Отказ', color: '#EF4444' }],
                     dashboardChart: null, searchTimeout: null
@@ -199,9 +272,9 @@
                 saveAuth(data) { this.authToken = data.access_token; this.currentUser = data.user; this.isAuthenticated = true; localStorage.setItem('hr_token', data.access_token); localStorage.setItem('hr_user', JSON.stringify(data.user)); this.authForm = { email: '', password: '', first_name: '', last_name: '', company_name: '' }; this.loadDashboard(); this.loadSettings(); },
                 logout() { this.isAuthenticated = false; this.authToken = null; this.currentUser = null; localStorage.removeItem('hr_token'); localStorage.removeItem('hr_user'); },
                 async apiFetch(url, options = {}) { const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) }; if (this.authToken) headers['Authorization'] = `Bearer ${this.authToken}`; const res = await fetch(url, { ...options, headers }); if (res.status === 401) { this.logout(); throw new Error('Unauthorized'); } return res; },
-                async loadDashboard() { try { const res = await this.apiFetch(`${this.apiUrl}/dashboard/`); if (res.ok) { this.dashboardData = await res.json(); this.$nextTick(() => this.renderDashboardChart()); } } catch (e) { console.error(e); } },
+                async loadDashboard() { try { const res = await this.apiFetch(`${this.apiUrl}/dashboard/stats`); if (res.ok) { this.dashboardData = await res.json(); this.$nextTick(() => this.renderDashboardChart()); } } catch (e) { console.error(e); } },
                 async fetchData() { try { const res = await this.apiFetch(`${this.apiUrl}/vacancies/`); if (res.ok) this.vacancies = await res.json(); } catch (e) { console.error(e); } },
-                async loadCandidates() { try { const params = new URLSearchParams(); if (this.filters.search) params.append('search', this.filters.search); if (this.filters.status) params.append('status', this.filters.status); const res = await this.apiFetch(`${this.apiUrl}/candidates/?${params}`); if (res.ok) this.candidatesList = await res.json(); } catch (e) { console.error(e); } },
+                async loadCandidates() { try { const params = new URLSearchParams({ page: this.candidatesList.page, per_page: 10, search: this.filters.search, status: this.filters.status, vacancy_id: this.filters.vacancy_id }); if (!this.filters.search) params.delete('search'); if (!this.filters.status) params.delete('status'); if (!this.filters.vacancy_id) params.delete('vacancy_id'); const res = await this.apiFetch(`${this.apiUrl}/candidates/search?${params}`); if (res.ok) this.candidatesList = await res.json(); } catch (e) { console.error(e); } },
                 debouncedSearch() { clearTimeout(this.searchTimeout); this.searchTimeout = setTimeout(() => this.loadCandidates(), 300); },
                 resetFilters() { this.filters = { search: '', status: '', vacancy_id: '' }; this.loadCandidates(); },
                 async loadSettings() { await this.loadCompanyProfile(); await this.loadPipelineStages(); },
@@ -225,13 +298,88 @@
                 previewTemplate() { const companyName = this.companyProfile.name || 'Компания'; this.templatePreview = { subject: this.templateForm.subject.replace('{first_name}', 'Иван').replace('{last_name}', 'Петров').replace('{vacancy_title}', 'Python Developer').replace('{company_name}', companyName), body: this.templateForm.body.replace('{first_name}', 'Иван').replace('{last_name}', 'Петров').replace('{vacancy_title}', 'Python Developer').replace('{company_name}', companyName) }; },
                 getTemplateTypeLabel(type) { const found = this.templateTypes.find(t => t.value === type); return found ? found.label : type; },
                 getTemplateTypeColor(type) { const colors = { 'invitation': 'bg-green-100 text-green-800', 'rejection': 'bg-red-100 text-red-800', 'offer': 'bg-yellow-100 text-yellow-800', 'custom': 'bg-gray-100 text-gray-800' }; return colors[type] || 'bg-gray-100 text-gray-800'; },
-                async createVacancy() { this.loading = true; try { const res = await this.apiFetch(`${this.apiUrl}/vacancies/`, { method: 'POST', body: JSON.stringify(this.newVacancy) }); if (res.ok) { this.showModal = false; this.newVacancy = { title: '', requirements: '' }; await this.fetchData(); } } catch (e) { console.error(e); } this.loading = false; },
-                async openVacancy(vacancyId) { try { const res = await this.apiFetch(`${this.apiUrl}/vacancies/${vacancyId}`); if (res.ok) { this.selectedVacancy = await res.json(); const candRes = await this.apiFetch(`${this.apiUrl}/candidates/?vacancy_id=${vacancyId}&limit=200`); if (candRes.ok) this.vacancyCandidates = (await candRes.json()).items || []; this.showVacancyDetail = true; this.$nextTick(() => this.initKanbanSortable()); } } catch (e) { console.error(e); } },
+                
+                // --- VACANCY ACTIONS (NEW) ---
+                openCreateVacancyModal() {
+                    this.isEditingVacancy = false;
+                    this.newVacancy = { title: '', requirements: '', description: '', salary_min: null, salary_max: null, experience: '', city: '' };
+                    this.showModal = true;
+                },
+                openEditVacancyModal(vac) {
+                    this.isEditingVacancy = true;
+                    this.editingVacancyId = vac.id;
+                    this.newVacancy = { ...vac }; // Копируем данные
+                    this.showModal = true;
+                },
+                async generateDescription() {
+                    // Проверка обязательных полей
+                    if (!this.newVacancy.title || !this.newVacancy.requirements) { 
+                        alert('Заполните "Должность" и "Ключевые навыки", чтобы AI знал, о чем писать.'); 
+                        return; 
+                    }
+                    
+                    this.loading = true;
+                    try {
+                        // Отправляем запрос на генерацию (без сохранения)
+                        const res = await this.apiFetch(`${this.apiUrl}/vacancies/preview_ai`, {
+                            method: 'POST',
+                            body: JSON.stringify(this.newVacancy)
+                        });
+                        
+                        if (res.ok) {
+                            const data = await res.json();
+                            // Вставляем полученный текст в поле описания
+                            this.newVacancy.description = data.description;
+                        } else {
+                            alert("Ошибка генерации. Проверьте консоль.");
+                        }
+                    } catch (e) { 
+                        console.error(e); 
+                        alert("Ошибка сети"); 
+                    } finally { 
+                        this.loading = false; 
+                    }
+                },
+                async saveVacancy() {
+                    this.loading = true;
+                    try {
+                        // 1. Подготовка данных (превращаем пустые строки в null)
+                        const payload = { ...this.newVacancy };
+                        if (payload.salary_min === "" || payload.salary_min === 0) payload.salary_min = null;
+                        if (payload.salary_max === "" || payload.salary_max === 0) payload.salary_max = null;
+                        if (payload.city === "") payload.city = null;
+                        if (payload.experience === "") payload.experience = null;
+
+                        if (this.isEditingVacancy) {
+                            // Редактирование (PATCH)
+                            await this.apiFetch(`${this.apiUrl}/vacancies/${this.editingVacancyId}`, {
+                                method: 'PATCH',
+                                body: JSON.stringify(payload)
+                            });
+                        } else {
+                            // Создание (POST)
+                            // Если описание пустое — используем генерацию, иначе обычное создание
+                            const endpoint = payload.description ? `${this.apiUrl}/vacancies/` : `${this.apiUrl}/vacancies/generate`;
+                            await this.apiFetch(endpoint, {
+                                method: 'POST',
+                                body: JSON.stringify(payload)
+                            });
+                        }
+                        this.showModal = false;
+                        this.fetchData();
+                    } catch (e) { 
+                        console.error(e); 
+                        alert("Ошибка сохранения: " + e.message); 
+                    }
+                    finally { this.loading = false; }
+                },
+
+                async openVacancy(vacancyId) { try { const res = await this.apiFetch(`${this.apiUrl}/vacancies/${vacancyId}`); if (res.ok) { this.selectedVacancy = await res.json(); const candRes = await this.apiFetch(`${this.apiUrl}/vacancies/${vacancyId}/candidates`); if (candRes.ok) this.vacancyCandidates = await candRes.json(); this.showVacancyDetail = true; this.$nextTick(() => this.initKanbanSortable()); } } catch (e) { console.error(e); } },
                 closeVacancyDetail() { this.showVacancyDetail = false; },
                 vacancyCandidatesByStatus(status) { return this.vacancyCandidates.filter(c => c.status === status); },
-                async openCandidateCard(candidateId) { try { const res = await this.apiFetch(`${this.apiUrl}/candidates/${candidateId}`); if (res.ok) { this.candidateDetail = await res.json(); this.showCandidateCard = true; } } catch (e) { console.error(e); } },
+                async openCandidateCard(candidateId) { try { const res = await this.apiFetch(`${this.apiUrl}/candidates/${candidateId}/detail`); if (res.ok) { this.candidateDetail = await res.json(); this.showCandidateCard = true; } } catch (e) { console.error(e); } },
                 closeCandidateCard() { this.showCandidateCard = false; },
-                async changeStatusFromCard(newStatus) { try { await this.apiFetch(`${this.apiUrl}/candidates/${this.candidateDetail.id}/status`, { method: 'PATCH', body: JSON.stringify({ status: newStatus }) }); this.candidateDetail.status = newStatus; const idx = this.vacancyCandidates.findIndex(c => c.id === this.candidateDetail.id); if (idx !== -1) this.vacancyCandidates[idx].status = newStatus; } catch (e) { console.error(e); } },
+                async changeStatusFromCard(newStatus) { try { await this.apiFetch(`${this.apiUrl}/candidates/${this.candidateDetail.id}`, { method: 'PATCH', body: JSON.stringify({ status: newStatus }) }); this.candidateDetail.status = newStatus; const idx = this.vacancyCandidates.findIndex(c => c.id === this.candidateDetail.id); if (idx !== -1) this.vacancyCandidates[idx].status = newStatus; } catch (e) { console.error(e); } },
                 async addComment() { if (!this.newComment.trim()) return; try { const res = await this.apiFetch(`${this.apiUrl}/candidates/${this.candidateDetail.id}/comments`, { method: 'POST', body: JSON.stringify({ text: this.newComment }) }); if (res.ok) { const comment = await res.json(); this.candidateDetail.comments = this.candidateDetail.comments || []; this.candidateDetail.comments.push(comment); this.newComment = ''; } } catch (e) { console.error(e); } },
                 getStatusLabel(key) { const stage = this.activeStatuses.find(s => s.key === key); return stage ? stage.label : key; },
                 getStatusClass(status) { const classes = { 'new': 'bg-blue-100 text-blue-800', 'screening': 'bg-purple-100 text-purple-800', 'interview': 'bg-yellow-100 text-yellow-800', 'offer': 'bg-orange-100 text-orange-800', 'hired': 'bg-green-100 text-green-800', 'rejected': 'bg-red-100 text-red-800' }; return classes[status] || 'bg-gray-100 text-gray-800'; },
@@ -239,7 +387,7 @@
                 getScoreBorderColor(score) { if (score >= 80) return 'border-l-green-500'; if (score >= 60) return 'border-l-yellow-500'; return 'border-l-red-500'; },
                 getTextColor(score) { if (score >= 80) return 'text-green-600'; if (score >= 60) return 'text-yellow-600'; return 'text-red-600'; },
                 renderDashboardChart() { const canvas = document.getElementById('dashboardChart'); if (!canvas) return; if (this.dashboardChart) this.dashboardChart.destroy(); const stats = this.dashboardData.funnel_stats || {}; const labels = this.activeStatuses.map(s => s.label); const data = this.activeStatuses.map(s => stats[s.key] || 0); const colors = this.activeStatuses.map(s => s.color); this.dashboardChart = new Chart(canvas, { type: 'bar', data: { labels, datasets: [{ label: 'Кандидаты', data, backgroundColor: colors }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } } }); },
-                initKanbanSortable() { document.querySelectorAll('.column-body').forEach(col => { if (col._sortable) return; col._sortable = new Sortable(col, { group: 'kanban', animation: 150, ghostClass: 'opacity-50', onEnd: async (evt) => { const candidateId = parseInt(evt.item.dataset.id); const newStatus = evt.to.dataset.status; try { await this.apiFetch(`${this.apiUrl}/candidates/${candidateId}/status`, { method: 'PATCH', body: JSON.stringify({ status: newStatus }) }); const cand = this.vacancyCandidates.find(c => c.id === candidateId); if (cand) cand.status = newStatus; } catch (e) { console.error(e); } } }); }); }
+                initKanbanSortable() { document.querySelectorAll('.column-body').forEach(col => { if (col._sortable) return; col._sortable = new Sortable(col, { group: 'kanban', animation: 150, ghostClass: 'opacity-50', onEnd: async (evt) => { const candidateId = parseInt(evt.item.dataset.id); const newStatus = evt.to.dataset.status; try { await this.apiFetch(`${this.apiUrl}/candidates/${candidateId}`, { method: 'PATCH', body: JSON.stringify({ status: newStatus }) }); const cand = this.vacancyCandidates.find(c => c.id === candidateId); if (cand) cand.status = newStatus; } catch (e) { console.error(e); } } }); }); }
             },
             mounted() { this.checkAuth(); }
         }).mount('#app')

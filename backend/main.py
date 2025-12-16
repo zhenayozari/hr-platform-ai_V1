@@ -2,7 +2,7 @@ from fastapi import FastAPI, Depends, HTTPException, status, Query
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from typing import List, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 from datetime import datetime
 import os
 import httpx
@@ -17,6 +17,7 @@ from .auth.dependencies import get_current_user, check_company_access
 
 # Settings
 from .routers.settings import router as settings_router
+
 app = FastAPI(
     title="HR Платформа API v2.0",
     description="API с авторизацией и мультитенантностью",
@@ -32,7 +33,6 @@ app.add_middleware(
 )
 
 app.include_router(auth_router)
-
 app.include_router(settings_router)
 
 @app.on_event("startup")
@@ -45,15 +45,28 @@ def root():
 
 # --- SCHEMAS (Схемы данных) ---
 
-# Вакансии
+# --- ВАКАНСИИ (ОБНОВЛЕНО) ---
 class VacancyCreate(BaseModel):
-    title: str = Field(..., title="Название вакансии")
-    description: str = Field(..., title="Описание")
+    title: str = Field(..., title="Название")
     requirements: str = Field(..., title="Требования")
+    # Новые поля (опциональные)
+    description: Optional[str] = None
+    salary_min: Optional[int] = None
+    salary_max: Optional[int] = None
+    experience: Optional[str] = None
+    employment_type: Optional[str] = None
+    city: Optional[str] = None
 
-class VacancyGenerate(BaseModel):
-    title: str
-    requirements: str
+class VacancyUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    requirements: Optional[str] = None
+    status: Optional[str] = None
+    salary_min: Optional[int] = None
+    salary_max: Optional[int] = None
+    experience: Optional[str] = None
+    employment_type: Optional[str] = None
+    city: Optional[str] = None
 
 class VacancyResponse(VacancyCreate):
     id: int
@@ -62,16 +75,9 @@ class VacancyResponse(VacancyCreate):
     class Config:
         from_attributes = True
 
-class VacancyDetailResponse(BaseModel):
-    id: int
-    title: str
-    description: str
-    requirements: str
-    status: str
+class VacancyDetailResponse(VacancyResponse):
     candidates_count: int
     candidates_by_status: dict
-    class Config:
-        from_attributes = True
 
 # Кандидаты
 class CandidateApply(BaseModel):
@@ -98,8 +104,16 @@ class CandidateResponse(BaseModel):
     vacancy_id: int
     vacancy_title: str
     created_at: datetime
+    
     class Config:
         from_attributes = True
+
+    # ЭТОТ ВАЛИДАТОР ЧИНИТ ОШИБКУ 500
+    @validator("vacancy_title", pre=True, always=True)
+    def get_vacancy_title(cls, v, values):
+        if isinstance(v, str):
+            return v
+        return "Вакансия" # Заглушка, если название не нашлось
 
 class CandidateDetailResponse(BaseModel):
     id: int
@@ -139,11 +153,11 @@ class DashboardStats(BaseModel):
 def create_vacancy(
     vacancy: VacancyCreate, 
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user) # <--- ЗАЩИТА
+    current_user: User = Depends(get_current_user)
 ):
     db_vacancy = Vacancy(
         **vacancy.dict(),
-        company_id=current_user.company_id, # <--- АВТОМАТИЧЕСКИ ИЗ ТОКЕНА
+        company_id=current_user.company_id,
         status="active"
     )
     db.add(db_vacancy)
@@ -151,13 +165,28 @@ def create_vacancy(
     db.refresh(db_vacancy)
     return db_vacancy
 
+# --- ОБНОВЛЕННЫЙ ЭНДПОИНТ ГЕНЕРАЦИИ (СОХРАНЯЕТ В БД) ---
 @app.post("/vacancies/generate", response_model=VacancyResponse)
 def generate_vacancy(
-    params: VacancyGenerate, 
+    params: VacancyCreate, 
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    ai_data = generate_vacancy_description(params.title, params.requirements)
+    # Формируем строку зарплаты для AI
+    salary_str = ""
+    if params.salary_min and params.salary_max:
+        salary_str = f"{params.salary_min} - {params.salary_max} руб."
+    elif params.salary_min:
+        salary_str = f"от {params.salary_min} руб."
+    
+    # Вызываем AI с новыми параметрами
+    ai_data = generate_vacancy_description(
+        title=params.title, 
+        requirements=params.requirements,
+        salary=salary_str,
+        city=params.city or "Не указан",
+        experience=params.experience or "Любой"
+    )
     
     # Форматируем текст
     conditions_text = ai_data.get('conditions', [])
@@ -176,13 +205,54 @@ def generate_vacancy(
         title=params.title,
         description=full_description,
         requirements=full_requirements,
-        company_id=current_user.company_id, # <--- АВТОМАТИЧЕСКИ
+        salary_min=params.salary_min,
+        salary_max=params.salary_max,
+        experience=params.experience,
+        employment_type=params.employment_type,
+        city=params.city,
+        company_id=current_user.company_id,
         status="active"
     )
     db.add(db_vacancy)
     db.commit()
     db.refresh(db_vacancy)
     return db_vacancy
+
+# --- НОВЫЙ ЭНДПОИНТ ПРЕДПРОСМОТРА (НЕ СОХРАНЯЕТ В БД) ---
+@app.post("/vacancies/preview_ai")
+def preview_vacancy_ai(
+    params: VacancyCreate, 
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Генерирует описание вакансии, но НЕ сохраняет в базу.
+    Нужно для предпросмотра в форме создания.
+    """
+    # Формируем строку зарплаты
+    salary_str = ""
+    if params.salary_min and params.salary_max:
+        salary_str = f"{params.salary_min} - {params.salary_max} руб."
+    elif params.salary_min:
+        salary_str = f"от {params.salary_min} руб."
+    
+    # Вызываем AI
+    ai_data = generate_vacancy_description(
+        title=params.title, 
+        requirements=params.requirements,
+        salary=salary_str,
+        city=params.city or "Не указан",
+        experience=params.experience or "Любой"
+    )
+    
+    # Формируем красивый текст
+    conditions_text = ai_data.get('conditions', [])
+    if isinstance(conditions_text, list):
+        conditions_text = "\n".join([f"- {c}" for c in conditions_text])
+    
+    full_description = f"{ai_data.get('description', '')}\n\nУсловия:\n{conditions_text}"
+    
+    # Возвращаем только текст
+    return {"description": full_description}
 
 # --- ПУБЛИЧНЫЙ ЭНДПОИНТ ДЛЯ БОТА ---
 @app.get("/public/vacancies", response_model=List[VacancyResponse])
@@ -227,9 +297,33 @@ def get_vacancy_detail(
         "description": vacancy.description,
         "requirements": vacancy.requirements,
         "status": vacancy.status,
+        "company_id": vacancy.company_id,
+        "salary_min": vacancy.salary_min,
+        "salary_max": vacancy.salary_max,
+        "experience": vacancy.experience,
+        "employment_type": vacancy.employment_type,
+        "city": vacancy.city,
         "candidates_count": len(candidates),
         "candidates_by_status": status_counts
     }
+
+# --- НОВЫЙ ЭНДПОИНТ РЕДАКТИРОВАНИЯ ---
+@app.patch("/vacancies/{vacancy_id}", response_model=VacancyResponse)
+def update_vacancy(
+    vacancy_id: int,
+    data: VacancyUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    vacancy = db.query(Vacancy).filter(Vacancy.id == vacancy_id).first()
+    check_company_access(vacancy, current_user, "Вакансия")
+    
+    for field, value in data.dict(exclude_unset=True).items():
+        setattr(vacancy, field, value)
+    
+    db.commit()
+    db.refresh(vacancy)
+    return vacancy
 
 @app.get("/vacancies/{vacancy_id}/candidates", response_model=List[CandidateResponse])
 def get_vacancy_candidates(
@@ -296,7 +390,6 @@ def apply_candidate(application: CandidateApply, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(db_candidate)
     
-    # --- ИСПРАВЛЕНИЕ: Возвращаем словарь с явным указанием vacancy_title ---
     return {
         "id": db_candidate.id,
         "ai_score": db_candidate.ai_score,
@@ -305,7 +398,7 @@ def apply_candidate(application: CandidateApply, db: Session = Depends(get_db)):
         "first_name": db_candidate.first_name,
         "last_name": db_candidate.last_name,
         "vacancy_id": db_candidate.vacancy_id,
-        "vacancy_title": vacancy.title, # <--- Вот чего не хватало!
+        "vacancy_title": vacancy.title,
         "created_at": db_candidate.created_at
     }
 
@@ -469,7 +562,19 @@ async def update_candidate_status(
 
     db.commit()
     db.refresh(candidate)
-    return candidate
+    
+    # РУЧНОЙ ВОЗВРАТ ДАННЫХ (чтобы не было ошибки 500)
+    return {
+        "id": candidate.id,
+        "ai_score": candidate.ai_score,
+        "ai_summary": candidate.ai_summary,
+        "status": candidate.status,
+        "first_name": candidate.first_name,
+        "last_name": candidate.last_name,
+        "vacancy_id": candidate.vacancy_id,
+        "vacancy_title": candidate.vacancy.title if candidate.vacancy else "Архив",
+        "created_at": candidate.created_at
+    }
 
 @app.post("/candidates/{candidate_id}/comments")
 def add_comment(
