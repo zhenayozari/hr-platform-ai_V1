@@ -308,7 +308,6 @@ def apply_candidate(application: CandidateApply, db: Session = Depends(get_db)):
         "vacancy_title": vacancy.title, # <--- Вот чего не хватало!
         "created_at": db_candidate.created_at
     }
-    return result
 
 # ПОИСК КАНДИДАТОВ (Для вкладки "Кандидаты")
 class CandidateListResponse(BaseModel):

@@ -447,6 +447,22 @@
                     await this.apiFetch(`${this.apiUrl}/settings/users/${id}`, { method: 'DELETE' });
                     this.loadUsers();
                 },
+
+                async updateUserRole(user) {
+                    try {
+                        await this.apiFetch(`${this.apiUrl}/settings/users/${user.id}/role`, {
+                            method: 'PATCH',
+                            body: JSON.stringify({ role: user.role })
+                        });
+                        // Можно добавить уведомление об успехе, но не обязательно
+                    } catch (e) {
+                        console.error(e);
+                        alert("Ошибка при смене роли");
+                    this.loadUsers(); // Откатываем изменения в таблице при ошибке
+                    }
+                },
+
+
                 // --- ACTIONS ---
                 async createVacancy() {
                     if (!this.newVacancy.title) return;
